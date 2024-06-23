@@ -3,3 +3,4 @@ yt_dlp_exe/
 yt_dlp_out/
 discord_bot_token
 config.json
+.env

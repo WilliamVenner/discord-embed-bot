@@ -12,11 +12,11 @@ use tokio::{
 };
 
 const YT_DLP_EXE: &str = {
-	#[cfg(target_os = "windows")]
+	#[cfg(all(target_os = "windows", target_arch = "x86_64"))]
 	{
 		"yt-dlp.exe"
 	}
-	#[cfg(target_os = "linux")]
+	#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 	{
 		"yt-dlp_linux"
 	}
