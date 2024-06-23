@@ -195,22 +195,25 @@ impl YtDlp {
 	}
 }
 
-pub struct YtDlpDaemon {
+struct YtDlpDaemonInner {
 	yt_dlp: RwLock<YtDlp>,
 	last_update_check: Mutex<Instant>,
 }
+
+#[derive(Clone)]
+pub struct YtDlpDaemon(Arc<YtDlpDaemonInner>);
 impl YtDlpDaemon {
-	pub async fn new() -> Result<Arc<Self>, anyhow::Error> {
+	pub async fn new() -> Result<Self, anyhow::Error> {
 		log::info!("Initializing yt-dlp daemon...");
 
 		if Path::new("yt_dlp_out").exists() {
 			tokio::fs::remove_dir_all("yt_dlp_out").await?;
 		}
 
-		Ok(Arc::new(Self {
+		Ok(Self(Arc::new(YtDlpDaemonInner {
 			yt_dlp: RwLock::new(YtDlp::new().await?),
 			last_update_check: Mutex::new(Instant::now()),
-		}))
+		})))
 	}
 
 	pub async fn update(&self) -> Result<(), anyhow::Error> {
@@ -218,7 +221,7 @@ impl YtDlpDaemon {
 
 		let release = YtDlpRelease::latest().await?;
 
-		let mut yt_dlp = self.yt_dlp.write().await;
+		let mut yt_dlp = self.0.yt_dlp.write().await;
 
 		if release.tag_name == yt_dlp.tag_name {
 			log::info!("yt-dlp daemon up-to-date!");
@@ -234,25 +237,25 @@ impl YtDlpDaemon {
 		Ok(())
 	}
 
-	pub async fn download(self: &Arc<Self>, url: &str) -> Result<Box<Path>, anyhow::Error> {
+	pub async fn download(&self, url: &str) -> Result<DownloadedMedia, anyhow::Error> {
 		let url_hash = format!("{:x}.mp4", sha2::Sha256::digest(url));
 		let path = Path::new("yt_dlp_out").join(url_hash).into_boxed_path();
 
 		let download = async {
 			tokio::fs::create_dir_all("yt_dlp_out").await?;
 
-			self.yt_dlp.read().await.download(url, &path).await
+			self.0.yt_dlp.read().await.download(url, &path).await
 		};
 
 		self.update_check().await;
 
 		download.await?;
 
-		Ok(path)
+		Ok(DownloadedMedia { path })
 	}
 
-	async fn update_check(self: &Arc<Self>) {
-		let mut last_update_check = self.last_update_check.lock().await;
+	async fn update_check(&self) {
+		let mut last_update_check = self.0.last_update_check.lock().await;
 
 		if last_update_check.elapsed() > YT_DLP_UPDATE_CHECK_INTERVAL {
 			*last_update_check = Instant::now();
@@ -263,6 +266,22 @@ impl YtDlpDaemon {
 					log::error!("Failed to update yt-dlp: {}", err);
 				}
 			});
+		}
+	}
+}
+
+pub struct DownloadedMedia {
+	pub path: Box<Path>,
+}
+impl Drop for DownloadedMedia {
+	fn drop(&mut self) {
+		log::info!("Deleting {}", self.path.display());
+
+		if let Ok(rt) = tokio::runtime::Handle::try_current() {
+			let path = self.path.clone();
+			rt.spawn(async move { tokio::fs::remove_file(&path).await });
+		} else {
+			std::fs::remove_file(&self.path).ok();
 		}
 	}
 }
