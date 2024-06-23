@@ -2,7 +2,14 @@
 name = "discord-embed-bot"
 version = "0.1.0"
 edition = "2021"
+description = "Discord Bot that fixes embeds to websites that don't provide video embeds"
+authors = ["William Venner <william@venner.io>"]
+repository = "https://github.com/WilliamVenner/discord-embed-bot"
 publish = false
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
 
 [dependencies]
 tokio = { version = "1", features = ["full", "parking_lot", "rt-multi-thread"] }
