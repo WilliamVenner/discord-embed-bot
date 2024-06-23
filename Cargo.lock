@@ -107,24 +107,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
-name = "based-ffmpreg"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fs2",
- "log",
- "parking_lot",
- "pretty_env_logger",
- "regex",
- "reqwest 0.12.5",
- "serde",
- "serde_json",
- "serenity",
- "sha2",
- "tokio",
-]
-
-[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -333,6 +315,24 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer",
  "crypto-common",
+]
+
+[[package]]
+name = "discord-embed-bot"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fs2",
+ "log",
+ "parking_lot",
+ "pretty_env_logger",
+ "regex",
+ "reqwest 0.12.5",
+ "serde",
+ "serde_json",
+ "serenity",
+ "sha2",
+ "tokio",
 ]
 
 [[package]]

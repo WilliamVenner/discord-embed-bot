@@ -9,7 +9,7 @@ impl Releases {
 			reqwest::Client::new()
 				.get(format!("https://api.github.com/repos/{repo}/releases").as_str())
 				.timeout(timeout)
-				.header("User-Agent", "based-ffmpreg")
+				.header("User-Agent", env!("CARGO_PKG_NAME"))
 				.send()
 				.await?
 				.json()
