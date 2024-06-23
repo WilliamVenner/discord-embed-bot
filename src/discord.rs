@@ -1,6 +1,6 @@
 use crate::{config::CompiledConfig, logging, AppContext};
 use serenity::{
-	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Message},
+	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Message, MessageUpdateEvent},
 	async_trait,
 	futures::StreamExt,
 	prelude::*,
@@ -40,15 +40,25 @@ impl DiscordBot {
 
 		let typing = msg.channel_id.start_typing(&ctx.http);
 
-		// Wait for message to have an embed, if any
-		if msg.embeds.is_empty() {
-			let msg_id = msg.id;
-			let mut message_updates = serenity::collector::collect(&ctx.shard, move |ev| match ev {
-				serenity::all::Event::MessageUpdate(x) if x.id == msg_id => Some(()),
+		let mut replace_embed = {
+			match msg.embeds.len() {
+				0 => {
+					// Wait for message to have an embed, if any
+					let mut message_updates = serenity::collector::collect(&ctx.shard, move |ev| match ev {
+						serenity::all::Event::MessageUpdate(MessageUpdateEvent {
+							id, embeds: Some(embeds), ..
+						}) if *id == msg.id => Some(if embeds.len() == 1 { Some(embeds[0].clone()) } else { None }),
+						_ => None,
+					});
+					match tokio::time::timeout(Duration::from_millis(2000), message_updates.next()).await {
+						Ok(Some(Some(embed))) => Some(embed),
+						_ => None,
+					}
+				}
+				1 => Some(msg.embeds[0].clone()),
 				_ => None,
-			});
-			let _ = tokio::time::timeout(Duration::from_millis(2000), message_updates.next()).await;
-		}
+			}
+		};
 
 		let media = match self.app_ctx.yt_dlp.download(download_url).await {
 			Ok(media) => media,
@@ -73,10 +83,8 @@ impl DiscordBot {
 			.add_file(file)
 			.allowed_mentions(CreateAllowedMentions::new());
 
-		let should_modify_embed = msg.embeds.len() == 1;
-
-		if should_modify_embed {
-			let mut embed = core::mem::take(&mut msg.embeds).into_iter().next().unwrap();
+		if let Some(embed) = &mut replace_embed {
+			let mut embed = core::mem::take(embed);
 			embed.image = None;
 			embed.video = None;
 			embed.thumbnail = None;
@@ -92,7 +100,7 @@ impl DiscordBot {
 
 		drop(typing);
 
-		if should_modify_embed {
+		if replace_embed.is_some() {
 			msg.edit(ctx, EditMessage::new().suppress_embeds(true)).await.ok();
 		}
 	}
