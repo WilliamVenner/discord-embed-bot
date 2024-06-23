@@ -113,6 +113,7 @@ dependencies = [
  "anyhow",
  "fs2",
  "log",
+ "parking_lot",
  "pretty_env_logger",
  "regex",
  "reqwest 0.12.5",

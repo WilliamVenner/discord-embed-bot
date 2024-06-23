@@ -1,4 +1,4 @@
-use crate::{config::CompiledConfig, AppContext};
+use crate::{config::CompiledConfig, logging, AppContext};
 use serenity::{
 	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Message},
 	async_trait,
@@ -128,10 +128,16 @@ impl DiscordBot {
 
 #[async_trait]
 impl EventHandler for DiscordBot {
-	async fn ready(&self, _ctx: Context, ready: serenity::all::Ready) {
+	async fn ready(&self, ctx: Context, ready: serenity::all::Ready) {
 		log::info!("Discord bot connected as {}", ready.user.name);
 		log::info!("Invite link: https://discord.com/oauth2/authorize?client_id={}", ready.user.id);
 		log::info!("Member of {} guilds", ready.guilds.len());
+
+		let config = self.app_ctx.config.get().await;
+
+		if let Some(admin_guild) = &config.admin_guild {
+			logging::connect_discord(admin_guild.log_channel_id, ctx.clone()).await;
+		}
 	}
 
 	async fn message(&self, ctx: Context, msg: Message) {

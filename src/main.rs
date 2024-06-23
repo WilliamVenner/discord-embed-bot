@@ -7,6 +7,7 @@ use yt_dlp::YtDlpDaemon;
 mod config;
 mod discord;
 mod github;
+mod logging;
 mod util;
 mod yt_dlp;
 
@@ -46,12 +47,16 @@ pub struct AppContext {
 
 #[tokio::main]
 async fn main() {
-	pretty_env_logger::formatted_timed_builder()
-		.filter_module("tracing", log::LevelFilter::Warn)
-		.filter_module("serenity", log::LevelFilter::Warn)
-		.filter_module("tokio", log::LevelFilter::Warn)
-		.filter_level(log::LevelFilter::Info)
-		.init();
+	logging::DiscordLogger::init(
+		pretty_env_logger::formatted_timed_builder()
+			.filter_module("tracing", log::LevelFilter::Warn)
+			.filter_module("serenity", log::LevelFilter::Warn)
+			.filter_module("tokio", log::LevelFilter::Warn)
+			.filter_level(log::LevelFilter::Info)
+			.build(),
+	);
+
+	log::info!("Starting...");
 
 	let mut discord_bot_token = None;
 
