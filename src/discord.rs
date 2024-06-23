@@ -13,6 +13,7 @@ fn discord_bot_permissions() -> GatewayIntents {
 		| GatewayIntents::GUILD_MESSAGE_REACTIONS
 		| GatewayIntents::GUILD_MESSAGE_TYPING
 		| GatewayIntents::GUILD_EMOJIS_AND_STICKERS
+		| GatewayIntents::GUILD_MESSAGES
 }
 
 #[derive(Clone)]
@@ -21,12 +22,18 @@ struct DiscordBot {
 }
 impl DiscordBot {
 	async fn generic_message(&self, ctx: Context, msg: Message, config: Arc<CompiledConfig>) {
-		let Some(download_url) = config.link_regexes.iter().find_map(|regex| {
+		let mut download_urls = config.link_regexes.iter().filter_map(|regex| {
 			let captures = regex.captures(&msg.content)?;
 			Some(captures.get(1).unwrap_or_else(|| captures.get(0).unwrap()).as_str())
-		}) else {
+		});
+
+		let Some(download_url) = download_urls.next() else {
 			return;
 		};
+
+		if download_urls.next().is_some() {
+			return;
+		}
 
 		let typing = msg.channel_id.start_typing(&ctx.http);
 
