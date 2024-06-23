@@ -88,7 +88,6 @@ impl YtDlpRelease {
 pub struct YtDlp {
 	tag_name: Box<str>,
 	exe_path: Box<Path>,
-	_exe: File,
 }
 impl YtDlp {
 	pub async fn new() -> Result<Self, anyhow::Error> {
@@ -135,11 +134,7 @@ impl YtDlp {
 		if exe_path.metadata().is_ok_and(|m| m.len() == size) {
 			log::info!("yt-dlp release {} already downloaded", tag_name);
 
-			return Ok(Self {
-				tag_name,
-				_exe: File::open(exe_path.as_ref()).await?,
-				exe_path,
-			});
+			return Ok(Self { tag_name, exe_path });
 		}
 
 		log::info!("Downloading yt-dlp release {}", tag_name);
@@ -160,11 +155,7 @@ impl YtDlp {
 			}
 		}
 
-		Ok(Self {
-			tag_name,
-			exe_path,
-			_exe: exe,
-		})
+		Ok(Self { tag_name, exe_path })
 	}
 
 	pub async fn download(&self, url: &str, out_path: &Path) -> Result<(), anyhow::Error> {
