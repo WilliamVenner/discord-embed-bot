@@ -1,7 +1,8 @@
 use crate::{config::CompiledConfig, AppContext};
 use serenity::{
-	all::{CreateAllowedMentions, CreateAttachment, CreateMessage, Message},
+	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Message},
 	async_trait,
+	futures::StreamExt,
 	prelude::*,
 	FutureExt,
 };
@@ -21,21 +22,33 @@ struct DiscordBot {
 	app_ctx: AppContext,
 }
 impl DiscordBot {
-	async fn generic_message(&self, ctx: Context, msg: Message, config: Arc<CompiledConfig>) {
-		let mut download_urls = config.link_regexes.iter().filter_map(|regex| {
-			let captures = regex.captures(&msg.content)?;
-			Some(captures.get(1).unwrap_or_else(|| captures.get(0).unwrap()).as_str())
-		});
+	async fn generic_message(&self, ctx: Context, mut msg: Message, config: Arc<CompiledConfig>) {
+		let mut download_urls = config
+			.link_regexes
+			.iter()
+			.flat_map(|regex| regex.find_iter(&msg.content))
+			.map(|match_| match_.as_str());
 
 		let Some(download_url) = download_urls.next() else {
 			return;
 		};
 
+		// Reject multiple URLs
 		if download_urls.next().is_some() {
 			return;
 		}
 
 		let typing = msg.channel_id.start_typing(&ctx.http);
+
+		// Wait for message to have an embed, if any
+		if msg.embeds.is_empty() {
+			let msg_id = msg.id;
+			let mut message_updates = serenity::collector::collect(&ctx.shard, move |ev| match ev {
+				serenity::all::Event::MessageUpdate(x) if x.id == msg_id => Some(()),
+				_ => None,
+			});
+			let _ = tokio::time::timeout(Duration::from_millis(2000), message_updates.next()).await;
+		}
 
 		let media = match self.app_ctx.yt_dlp.download(download_url).await {
 			Ok(media) => media,
@@ -55,22 +68,33 @@ impl DiscordBot {
 			}
 		};
 
-		if let Err(err) = msg
-			.channel_id
-			.send_message(
-				&ctx,
-				CreateMessage::new()
-					.reference_message(&msg)
-					.add_file(file)
-					.allowed_mentions(CreateAllowedMentions::new()),
-			)
-			.await
-		{
+		let mut reply = CreateMessage::new()
+			.reference_message(&msg)
+			.add_file(file)
+			.allowed_mentions(CreateAllowedMentions::new());
+
+		let should_modify_embed = msg.embeds.len() == 1;
+
+		if should_modify_embed {
+			let mut embed = core::mem::take(&mut msg.embeds).into_iter().next().unwrap();
+			embed.image = None;
+			embed.video = None;
+			embed.thumbnail = None;
+			embed.provider = None;
+			reply = reply.add_embed(CreateEmbed::from(embed));
+		}
+
+		if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
 			log::error!("Failed to send {download_url} ({err})");
-			msg.react(ctx, '❌').await.ok();
+			msg.react(&ctx, '❌').await.ok();
+			return;
 		}
 
 		drop(typing);
+
+		if should_modify_embed {
+			msg.edit(ctx, EditMessage::new().suppress_embeds(true)).await.ok();
+		}
 	}
 
 	async fn admin_config_message(&self, ctx: Context, msg: Message, _config: Arc<CompiledConfig>) {

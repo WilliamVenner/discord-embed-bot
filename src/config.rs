@@ -48,7 +48,7 @@ impl TryFrom<&Config> for CompiledConfig {
 			link_regexes: config
 				.link_regexes
 				.iter()
-				.map(|regex| regex::Regex::new(regex))
+				.map(|regex| regex::RegexBuilder::new(regex).case_insensitive(true).build())
 				.collect::<Result<Vec<_>, _>>()?
 				.into_boxed_slice(),
 
