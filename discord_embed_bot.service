@@ -1,0 +1,12 @@
+[Unit]
+Description=Discord Embed Bot
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/docker start -a discord_embed_bot
+ExecStop=/usr/bin/docker stop -t 2 discord_embed_bot
+
+[Install]
+WantedBy=default.target
