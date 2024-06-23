@@ -1,4 +1,5 @@
-use crate::{github, util::AsyncFileLockShared};
+use crate::github;
+use anyhow::Context;
 use sha2::Digest;
 use std::{
 	path::{Path, PathBuf},
@@ -136,7 +137,7 @@ impl YtDlp {
 
 			return Ok(Self {
 				tag_name,
-				_exe: File::open(exe_path.as_ref()).await?.try_lock_shared().await?,
+				_exe: File::open(exe_path.as_ref()).await?,
 				exe_path,
 			});
 		}
@@ -145,7 +146,7 @@ impl YtDlp {
 
 		tokio::fs::create_dir_all("yt_dlp_exe").await?;
 
-		let mut exe = File::create(exe_path.as_ref()).await?.try_lock_shared().await?;
+		let mut exe = File::create(exe_path.as_ref()).await?;
 
 		tokio::io::copy(&mut reqwest::get(browser_download_url.as_ref()).await?.bytes().await?.as_ref(), &mut exe).await?;
 
@@ -242,7 +243,7 @@ impl YtDlpDaemon {
 		let path = Path::new("yt_dlp_out").join(url_hash).into_boxed_path();
 
 		let download = async {
-			tokio::fs::create_dir_all("yt_dlp_out").await?;
+			tokio::fs::create_dir_all("yt_dlp_out").await.context("creating yt_dlp_out directory")?;
 
 			self.0.yt_dlp.read().await.download(url, &path).await
 		};

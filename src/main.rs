@@ -8,7 +8,6 @@ mod config;
 mod discord;
 mod github;
 mod logging;
-mod util;
 mod yt_dlp;
 
 pub struct App {
