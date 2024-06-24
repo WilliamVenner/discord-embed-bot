@@ -4,6 +4,7 @@ use config::ConfigDaemon;
 use discord::DiscordBotDaemon;
 use yt_dlp::YtDlpDaemon;
 
+mod cmd;
 mod config;
 mod discord;
 mod github;

@@ -1,6 +1,6 @@
-use crate::{config::CompiledConfig, logging, AppContext};
+use crate::{cmd, config::CompiledConfig, logging, AppContext};
 use serenity::{
-	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Message, MessageUpdateEvent},
+	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Interaction, Message, MessageUpdateEvent},
 	async_trait,
 	futures::StreamExt,
 	prelude::*,
@@ -141,6 +141,8 @@ impl EventHandler for DiscordBot {
 		log::info!("Invite link: https://discord.com/oauth2/authorize?client_id={}", ready.user.id);
 		log::info!("Member of {} guilds", ready.guilds.len());
 
+		cmd::register(&ctx).await.expect("Failed to register /download command");
+
 		let config = self.app_ctx.config.get().await;
 
 		if let Some(admin_guild) = &config.admin_guild {
@@ -159,6 +161,16 @@ impl EventHandler for DiscordBot {
 			self.admin_config_message(ctx, msg, config).await;
 		} else {
 			self.generic_message(ctx, msg, config).await;
+		}
+	}
+
+	async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+		if let Interaction::Command(command) = interaction {
+			if command.data.name.as_str() == "download" {
+				if let Err(err) = cmd::run(&self.app_ctx, &ctx, &command, &command.data.options()).await {
+					log::error!("Failed to run /download command: {err}");
+				}
+			}
 		}
 	}
 }
