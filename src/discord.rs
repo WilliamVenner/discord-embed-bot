@@ -1,6 +1,9 @@
 use crate::{cmd, config::CompiledConfig, logging, AppContext};
 use serenity::{
-	all::{CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateMessage, EditMessage, Interaction, Message, MessageUpdateEvent},
+	all::{
+		CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
+		EditMessage, Interaction, Message, MessageUpdateEvent,
+	},
 	async_trait,
 	futures::StreamExt,
 	prelude::*,
@@ -169,6 +172,16 @@ impl EventHandler for DiscordBot {
 			if command.data.name.as_str() == "download" {
 				if let Err(err) = cmd::run(&self.app_ctx, &ctx, &command, &command.data.options()).await {
 					log::error!("Failed to run /download command: {err}");
+
+					command
+						.create_response(
+							ctx,
+							CreateInteractionResponse::Message(
+								CreateInteractionResponseMessage::new().ephemeral(true).content("Internal error occurred"),
+							),
+						)
+						.await
+						.ok();
 				}
 			}
 		}

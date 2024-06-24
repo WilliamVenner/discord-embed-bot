@@ -37,32 +37,24 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 			.map_err(Into::into);
 	};
 
-	let msg: Result<_, anyhow::Error> = async {
-		let media = app_ctx.yt_dlp.download(download_url).await.map_err(|err| {
-			log::error!("Failed to download {download_url} ({err})");
-			err
-		})?;
-
-		Ok(CreateInteractionResponse::Message(
-			CreateInteractionResponseMessage::new().add_file(CreateAttachment::path(&media.path).await?),
-		))
-	}
-	.await;
+	let media = app_ctx.yt_dlp.download(download_url).await.map_err(|err| {
+		log::error!("Failed to download {download_url} ({err})");
+		err
+	});
 
 	command
 		.create_response(
 			ctx,
-			match msg {
-				Ok(msg) => msg,
+			CreateInteractionResponse::Message(match media {
+				Ok(media) => CreateInteractionResponseMessage::new().add_file(CreateAttachment::path(&media.path).await?),
 				Err(err) => {
 					log::error!("Failed to download {download_url} ({err})");
-					CreateInteractionResponse::Message(
-						CreateInteractionResponseMessage::new()
-							.ephemeral(true)
-							.content("Failed to download a video from this URL!"),
-					)
+
+					CreateInteractionResponseMessage::new()
+						.ephemeral(true)
+						.content("Failed to download a video from this URL!")
 				}
-			},
+			}),
 		)
 		.await
 		.map_err(Into::into)
