@@ -2,7 +2,7 @@ use crate::AppContext;
 use serenity::{
 	all::{
 		Command, CommandInteraction, CreateAttachment, CreateCommand, CreateCommandOption, CreateInteractionResponse,
-		CreateInteractionResponseMessage, ResolvedOption, ResolvedValue,
+		CreateInteractionResponseFollowup, CreateInteractionResponseMessage, ResolvedOption, ResolvedValue,
 	},
 	prelude::*,
 };
@@ -37,24 +37,28 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 			.map_err(Into::into);
 	};
 
+	command
+		.create_response(&ctx, CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new()))
+		.await?;
+
 	let media = app_ctx.yt_dlp.download(download_url).await.map_err(|err| {
 		log::error!("Failed to download {download_url} ({err})");
 		err
 	});
 
 	command
-		.create_response(
+		.create_followup(
 			ctx,
-			CreateInteractionResponse::Message(match &media {
-				Ok(media) => CreateInteractionResponseMessage::new().add_file(CreateAttachment::path(&media.path).await?),
+			match &media {
+				Ok(media) => CreateInteractionResponseFollowup::new().add_file(CreateAttachment::path(&media.path).await?),
 				Err(err) => {
 					log::error!("Failed to download {download_url} ({err})");
 
-					CreateInteractionResponseMessage::new()
+					CreateInteractionResponseFollowup::new()
 						.ephemeral(true)
 						.content("Failed to download a video from this URL!")
 				}
-			}),
+			},
 		)
 		.await?;
 
