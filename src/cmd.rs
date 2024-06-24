@@ -45,7 +45,7 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 	command
 		.create_response(
 			ctx,
-			CreateInteractionResponse::Message(match media {
+			CreateInteractionResponse::Message(match &media {
 				Ok(media) => CreateInteractionResponseMessage::new().add_file(CreateAttachment::path(&media.path).await?),
 				Err(err) => {
 					log::error!("Failed to download {download_url} ({err})");
@@ -56,6 +56,9 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 				}
 			}),
 		)
-		.await
-		.map_err(Into::into)
+		.await?;
+
+	drop(media);
+
+	Ok(())
 }
