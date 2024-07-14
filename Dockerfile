@@ -5,6 +5,8 @@ WORKDIR /usr/src/app
 RUN apt update
 RUN apt install ffmpeg -y
 
+COPY . .
+
 RUN cargo fetch
 
 COPY . .
