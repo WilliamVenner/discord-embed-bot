@@ -139,6 +139,8 @@ impl YtDlp {
 
 		log::info!("Downloading yt-dlp release {}", tag_name);
 
+		tokio::fs::remove_dir_all("yt_dlp_exe").await?;
+
 		tokio::fs::create_dir_all("yt_dlp_exe").await?;
 
 		let mut exe = File::create(exe_path.as_ref()).await?;
