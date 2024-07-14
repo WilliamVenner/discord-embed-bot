@@ -2,6 +2,7 @@ use crate::github;
 use anyhow::Context;
 use sha2::Digest;
 use std::{
+	borrow::Cow,
 	path::{Path, PathBuf},
 	sync::Arc,
 	time::{Duration, Instant},
@@ -160,7 +161,7 @@ impl YtDlp {
 		Ok(Self { tag_name, exe_path })
 	}
 
-	pub async fn download(&self, url: &str, out_path: &Path) -> Result<(), anyhow::Error> {
+	pub async fn download<'a>(&self, url: &str, out_path: &'a Path) -> Result<Cow<'a, Path>, anyhow::Error> {
 		log::info!("Downloading {url} to {}", out_path.display());
 
 		let output = Command::new(self.exe_path.as_ref())
@@ -174,7 +175,19 @@ impl YtDlp {
 
 		if output.status.success() {
 			if out_path.exists() {
-				Ok(())
+				match (cfg!(debug_assertions), self.video_integrity_check(out_path).await) {
+					(true, Err(err)) => panic!("Video integrity check failed: {err}"),
+					(false, Err(err)) => log::error!("Video integrity check failed: {err}"),
+					(_, Ok(false)) => {
+						log::info!("Video appears to be corrupt, re-encoding...");
+						match self.reencode_video(out_path).await {
+							Ok(out_path) => return Ok(Cow::Owned(out_path)),
+							Err(err) => log::error!("Failed to re-encode video: {err}"),
+						}
+					}
+					(_, Ok(true)) => {}
+				}
+				Ok(Cow::Borrowed(out_path))
 			} else {
 				Err(anyhow::anyhow!("yt-dlp did not create the file"))
 			}
@@ -184,6 +197,57 @@ impl YtDlp {
 				output.status,
 				String::from_utf8_lossy(&output.stderr),
 				String::from_utf8_lossy(&output.stdout)
+			))
+		}
+	}
+
+	async fn video_integrity_check(&self, path: &Path) -> Result<bool, std::io::Error> {
+		let output = Command::new(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" })
+			.arg(path)
+			.output()
+			.await?;
+
+		let stdout = String::from_utf8_lossy(&output.stdout);
+		let stdout = stdout.as_ref();
+
+		let stderr = String::from_utf8_lossy(&output.stderr);
+		let stderr = stderr.as_ref();
+
+		if stderr.contains("Packet corrupt") || stdout.contains("Packet corrupt") {
+			return Ok(false);
+		}
+
+		Ok(true)
+	}
+
+	async fn reencode_video(&self, path: &Path) -> Result<PathBuf, std::io::Error> {
+		let reencoded_path = path.with_file_name(format!("{}_reencoded.mp4", path.file_stem().unwrap().to_string_lossy()));
+
+		let output = Command::new(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" })
+			.arg("-i")
+			.arg(path)
+			.args(["-vcodec", "libx264", "-acodec", "aac"])
+			.arg(&reencoded_path)
+			.output()
+			.await?;
+
+		if output.status.success() && reencoded_path.is_file() {
+			match (cfg!(debug_assertions), tokio::fs::remove_file(path).await) {
+				(_, Ok(())) => {}
+				(true, Err(err)) => panic!("Failed to remove original video: {err}"),
+				(false, Err(err)) => log::error!("Failed to remove original video: {err}"),
+			}
+
+			Ok(reencoded_path)
+		} else {
+			Err(std::io::Error::new(
+				std::io::ErrorKind::Other,
+				format!(
+					"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
+					output.status,
+					String::from_utf8_lossy(&output.stderr),
+					String::from_utf8_lossy(&output.stdout)
+				),
 			))
 		}
 	}
@@ -243,9 +307,9 @@ impl YtDlpDaemon {
 
 		self.update_check().await;
 
-		download.await?;
+		let path = download.await?;
 
-		Ok(DownloadedMedia { path })
+		Ok(DownloadedMedia { path: path.into() })
 	}
 
 	async fn update_check(&self) {
