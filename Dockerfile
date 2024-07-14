@@ -4,6 +4,9 @@ WORKDIR /usr/src/app
 
 COPY . .
 
+RUN apt update
+RUN apt install ffmpeg -y
+
 ENV RUSTFLAGS="-Ctarget-cpu=native"
 RUN cargo build --release
 
