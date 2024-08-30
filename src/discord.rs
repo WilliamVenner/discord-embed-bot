@@ -18,6 +18,9 @@ fn discord_bot_permissions() -> GatewayIntents {
 		| GatewayIntents::GUILD_MESSAGE_TYPING
 		| GatewayIntents::GUILD_EMOJIS_AND_STICKERS
 		| GatewayIntents::GUILD_MESSAGES
+		| GatewayIntents::DIRECT_MESSAGES
+		| GatewayIntents::DIRECT_MESSAGE_REACTIONS
+		| GatewayIntents::DIRECT_MESSAGE_TYPING
 }
 
 #[derive(Clone)]
