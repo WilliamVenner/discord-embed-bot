@@ -1,6 +1,5 @@
 use crate::github;
 use anyhow::Context;
-use sha2::Digest;
 use std::{
 	borrow::Cow,
 	path::{Path, PathBuf},
@@ -324,8 +323,8 @@ impl YtDlpDaemon {
 	}
 
 	pub async fn download(&self, url: &str) -> Result<DownloadedMedia, anyhow::Error> {
-		let url_hash = format!("{:x}.mp4", sha2::Sha256::digest(url));
-		let path = Path::new("yt_dlp_out").join(url_hash).into_boxed_path();
+		let path = format!("{}.mp4", uuid::Uuid::new_v4());
+		let path = Path::new("yt_dlp_out").join(path).into_boxed_path();
 
 		self.update_check().await; // This will complete really quickly and do stuff in the background.
 
