@@ -79,6 +79,7 @@ impl DiscordBot {
 			Ok(file) => file,
 			Err(err) => {
 				log::error!("Failed to create attachment for {download_url} ({err})");
+				msg.react(&ctx, '❌').await.ok();
 				return;
 			}
 		};
@@ -107,17 +108,20 @@ impl DiscordBot {
 
 					if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
 						log::error!("Failed to send secondary \"file was too large\" message for {download_url} ({err} {err:?})");
+						msg.react(&ctx, '❌').await.ok();
 					} else {
 						return;
 					}
 				} else {
 					log::error!("Failed to send secondary \"file was too large\" message for {download_url} (no raw URL found)");
+					msg.react(&ctx, '❌').await.ok();
 				}
 			}
 		}
 
 		if let Err(err) = result {
 			log::error!("Failed to send {download_url} ({err} {err:?})");
+			msg.react(&ctx, '❌').await.ok();
 			return;
 		}
 
