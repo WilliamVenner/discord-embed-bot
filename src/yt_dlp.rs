@@ -31,7 +31,7 @@ const YT_DLP_EXE: &str = {
 const YT_DLP_ARGS: &[&str] = &[
 	"--dump-json",
 	"-f",
-	"bestvideo[filesize<22MB]+bestaudio/best/bestvideo+bestaudio",
+	"bestvideo[filesize<22MB]+bestaudio[filesize<3MB]/best/bestvideo+bestaudio",
 	"-S",
 	"vcodec:h264",
 	"--merge-output-format",
