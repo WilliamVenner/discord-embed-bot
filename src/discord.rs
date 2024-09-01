@@ -99,7 +99,7 @@ impl DiscordBot {
 		}
 
 		if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
-			log::error!("Failed to send {download_url} ({err})");
+			log::error!("Failed to send {download_url} ({err} {err:?})");
 			msg.react(&ctx, '❌').await.ok();
 			return;
 		}
