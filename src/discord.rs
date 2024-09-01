@@ -99,14 +99,20 @@ impl DiscordBot {
 
 		let result = msg.channel_id.send_message(&ctx, reply.clone()).await.map(|_| ());
 
-		if let (Some(raw_url), Err(serenity::Error::Http(err))) = (media.url.as_deref(), &result) {
-			if err.status_code() == Some(StatusCode::PAYLOAD_TOO_LARGE) {
-				let reply = CreateMessage::new().content(format!("-# File was too large to upload\n{raw_url}"));
+		drop(typing);
 
-				if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
-					log::error!("Failed to send secondary file was too large message for {download_url} ({err} {err:?})");
+		if let Err(err) = &result {
+			if err.to_string().as_str() == "Request entity too large" {
+				if let Some(raw_url) = media.url.as_deref() {
+					let reply = CreateMessage::new().content(format!("-# File was too large to upload\n{raw_url}"));
+
+					if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
+						log::error!("Failed to send secondary \"file was too large\" message for {download_url} ({err} {err:?})");
+					} else {
+						return;
+					}
 				} else {
-					return;
+					log::error!("Failed to send secondary \"file was too large\" message for {download_url} (no raw URL found)");
 				}
 			}
 		}
@@ -115,8 +121,6 @@ impl DiscordBot {
 			log::error!("Failed to send {download_url} ({err} {err:?})");
 			return;
 		}
-
-		drop(typing);
 
 		if replace_embed.is_some() {
 			msg.edit(ctx, EditMessage::new().suppress_embeds(true)).await.ok();
