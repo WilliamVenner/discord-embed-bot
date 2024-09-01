@@ -29,6 +29,7 @@ const YT_DLP_EXE: &str = {
 };
 
 const YT_DLP_ARGS: &[&str] = &[
+	"--dump-json",
 	"-f",
 	"bestvideo[filesize<22MB]+bestaudio/best/bestvideo+bestaudio",
 	"-S",
@@ -42,7 +43,7 @@ const YT_DLP_ARGS: &[&str] = &[
 	"-o",
 ];
 
-const YT_DLP_UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(60 * 60); // 1 hour
+const YT_DLP_UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(30 * 60); // 30 mins
 
 #[derive(Debug)]
 struct YtDlpRelease {
