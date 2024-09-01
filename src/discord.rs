@@ -1,5 +1,4 @@
 use crate::{cmd, config::CompiledConfig, logging, AppContext};
-use reqwest::StatusCode;
 use serenity::{
 	all::{
 		CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
