@@ -70,7 +70,6 @@ impl DiscordBot {
 			Ok(media) => media,
 			Err(err) => {
 				log::error!("Failed to download {download_url} ({err})");
-				msg.react(ctx, '❌').await.ok();
 				return;
 			}
 		};
@@ -79,7 +78,6 @@ impl DiscordBot {
 			Ok(file) => file,
 			Err(err) => {
 				log::error!("Failed to create attachment for {download_url} ({err})");
-				msg.react(ctx, '❌').await.ok();
 				return;
 			}
 		};
@@ -100,7 +98,6 @@ impl DiscordBot {
 
 		if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
 			log::error!("Failed to send {download_url} ({err} {err:?})");
-			msg.react(&ctx, '❌').await.ok();
 			return;
 		}
 
