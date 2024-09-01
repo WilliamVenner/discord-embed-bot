@@ -144,7 +144,10 @@ impl DiscordBot {
 impl EventHandler for DiscordBot {
 	async fn ready(&self, ctx: Context, ready: serenity::all::Ready) {
 		log::info!("Discord bot connected as {}", ready.user.name);
-		log::info!("Invite link: https://discord.com/oauth2/authorize?client_id={}", ready.user.id);
+		log::info!(
+			"Invite link: https://discord.com/oauth2/authorize?client_id={}&permissions=274877966400&integration_type=0&scope=bot",
+			ready.user.id
+		);
 		log::info!("Member of {} guilds", ready.guilds.len());
 
 		cmd::register(&ctx).await.expect("Failed to register /download command");
