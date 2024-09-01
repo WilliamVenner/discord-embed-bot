@@ -5,7 +5,7 @@ Requires=docker.service
 
 [Service]
 Restart=always
-ExecStart=/usr/bin/docker start -a discord_embed_bot
+ExecStart=/usr/bin/docker run --name discord_embed_bot -v /etc/discord_embed_bot/config.json:/etc/discord_embed_bot/config.json -d discord_embed_bot_config
 ExecStop=/usr/bin/docker stop -t 2 discord_embed_bot
 
 [Install]
