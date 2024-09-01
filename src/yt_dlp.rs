@@ -30,7 +30,7 @@ const YT_DLP_EXE: &str = {
 
 const YT_DLP_ARGS: &[&str] = &[
 	"-f",
-	"bestvideo[filesize<30MB]+bestaudio[filesize<10mb]/best/bestvideo+bestaudio",
+	"bestvideo[filesize<22MB]+bestaudio/best/bestvideo+bestaudio",
 	"-S",
 	"vcodec:h264",
 	"--merge-output-format",
