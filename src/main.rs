@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+	borrow::Cow,
+	path::{Path, PathBuf},
+};
 
 use config::ConfigDaemon;
 use discord::DiscordBotDaemon;
@@ -15,9 +18,9 @@ pub struct App {
 	pub discord_bot: DiscordBotDaemon,
 }
 impl App {
-	pub async fn new(discord_bot_token: &str) -> Result<App, anyhow::Error> {
+	pub async fn new(config_path: &Path, discord_bot_token: &str) -> Result<App, anyhow::Error> {
 		let ctx = AppContext {
-			config: ConfigDaemon::new().await?,
+			config: ConfigDaemon::new(config_path).await?,
 			yt_dlp: YtDlpDaemon::new().await?,
 		};
 
@@ -59,11 +62,14 @@ async fn main() {
 	log::info!("Starting...");
 
 	let mut discord_bot_token = None;
+	let mut config_path = Cow::Borrowed(Path::new("config.json"));
 
 	let mut args = std::env::args();
 	while let Some(arg) = args.next() {
 		if arg == "--discord-bot-token" {
 			discord_bot_token = Some(args.next().expect("Expected a value for --discord-bot-token").into_boxed_str());
+		} else if arg == "--config-path" {
+			config_path = Cow::Owned(PathBuf::from(args.next().expect("Expected a value for --config-path")));
 		}
 	}
 
@@ -81,7 +87,7 @@ async fn main() {
 		}
 	}
 
-	App::new(discord_bot_token.expect("Expected a --discord-bot-token").as_ref())
+	App::new(config_path.as_ref(), discord_bot_token.expect("Expected a --discord-bot-token").as_ref())
 		.await
 		.unwrap()
 		.run()

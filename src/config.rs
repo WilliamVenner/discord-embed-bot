@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serenity::all::{ChannelId, GuildId};
 use std::{
 	cell::{Cell, RefCell},
+	path::Path,
 	sync::{atomic::AtomicU16, Arc},
 };
 use tokio::{
@@ -60,14 +61,14 @@ impl TryFrom<&Config> for CompiledConfig {
 #[derive(Clone)]
 pub struct ConfigDaemon(Arc<ConfigDaemonInner>);
 impl ConfigDaemon {
-	pub async fn new() -> Result<Self, anyhow::Error> {
+	pub async fn new(config_path: &Path) -> Result<Self, anyhow::Error> {
 		let mut file = OpenOptions::new()
 			.truncate(false)
 			.write(true)
 			.read(true)
 			.append(false)
 			.create(true)
-			.open("config.json")
+			.open(config_path)
 			.await?;
 
 		let size = file.metadata().await?.len();
