@@ -70,6 +70,14 @@ async fn main() {
 			discord_bot_token = Some(args.next().expect("Expected a value for --discord-bot-token").into_boxed_str());
 		} else if arg == "--config-path" {
 			config_path = Cow::Owned(PathBuf::from(args.next().expect("Expected a value for --config-path")));
+		} else if arg == "--discord-bot-token-path" {
+			let discord_bot_token_path = PathBuf::from(args.next().expect("Expected a value for --discord-bot-token-path"));
+
+			discord_bot_token = Some(
+				std::fs::read_to_string(&discord_bot_token_path)
+					.expect("Failed to read --discord-bot-token-path")
+					.into_boxed_str(),
+			);
 		}
 	}
 
@@ -87,10 +95,15 @@ async fn main() {
 		}
 	}
 
-	App::new(config_path.as_ref(), discord_bot_token.expect("Expected a --discord-bot-token").as_ref())
-		.await
-		.unwrap()
-		.run()
-		.await
-		.unwrap();
+	App::new(
+		config_path.as_ref(),
+		discord_bot_token
+			.expect("Expected a --discord-bot-token or --discord-bot-token-path")
+			.as_ref(),
+	)
+	.await
+	.unwrap()
+	.run()
+	.await
+	.unwrap();
 }
