@@ -1,4 +1,5 @@
 use crate::{cmd, config::CompiledConfig, logging, AppContext};
+use reqwest::StatusCode;
 use serenity::{
 	all::{
 		CreateAllowedMentions, CreateAttachment, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
@@ -67,7 +68,14 @@ impl DiscordBot {
 		};
 
 		let media = match self.app_ctx.yt_dlp.download(download_url).await {
-			Ok(media) => media,
+			Ok(Some(media)) => media,
+
+			Ok(None) => {
+				// No media found
+				log::warn!("No media found for {download_url}");
+				return;
+			}
+
 			Err(err) => {
 				log::error!("Failed to download {download_url} ({err})");
 				msg.react(ctx, '❌').await.ok();
@@ -90,15 +98,28 @@ impl DiscordBot {
 			.allowed_mentions(CreateAllowedMentions::new());
 
 		if let Some(embed) = &mut replace_embed {
-			let mut embed = core::mem::take(embed);
 			embed.image = None;
 			embed.video = None;
 			embed.thumbnail = None;
 			embed.provider = None;
-			reply = reply.add_embed(CreateEmbed::from(embed));
+			reply = reply.add_embed(CreateEmbed::from(embed.clone()));
 		}
 
-		if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
+		let result = msg.channel_id.send_message(&ctx, reply.clone()).await.map(|_| ());
+
+		if let (Some(raw_url), Err(serenity::Error::Http(err))) = (media.url.as_deref(), &result) {
+			if err.status_code() == Some(StatusCode::PAYLOAD_TOO_LARGE) {
+				let reply = CreateMessage::new().content(format!("-# File was too large to upload\n{raw_url}"));
+
+				if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
+					log::error!("Failed to send secondary file was too large message for {download_url} ({err} {err:?})");
+				} else {
+					return;
+				}
+			}
+		}
+
+		if let Err(err) = result {
 			log::error!("Failed to send {download_url} ({err} {err:?})");
 			msg.react(&ctx, '❌').await.ok();
 			return;
@@ -144,7 +165,10 @@ impl DiscordBot {
 impl EventHandler for DiscordBot {
 	async fn ready(&self, ctx: Context, ready: serenity::all::Ready) {
 		log::info!("Discord bot connected as {}", ready.user.name);
-		log::info!("Invite link: https://discord.com/oauth2/authorize?client_id={}", ready.user.id);
+		log::info!(
+			"Invite link: https://discord.com/oauth2/authorize?client_id={}&permissions=274877966400&integration_type=0&scope=bot",
+			ready.user.id
+		);
 		log::info!("Member of {} guilds", ready.guilds.len());
 
 		cmd::register(&ctx).await.expect("Failed to register /download command");

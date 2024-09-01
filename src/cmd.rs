@@ -50,7 +50,16 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 		.create_followup(
 			ctx,
 			match &media {
-				Ok(media) => CreateInteractionResponseFollowup::new().add_file(CreateAttachment::path(&media.path).await?),
+				Ok(Some(media)) => CreateInteractionResponseFollowup::new().add_file(CreateAttachment::path(&media.path).await?),
+
+				Ok(None) => {
+					log::warn!("No media found in {download_url}");
+
+					CreateInteractionResponseFollowup::new()
+						.ephemeral(true)
+						.content("No media found in this URL!")
+				}
+
 				Err(err) => {
 					log::error!("Failed to download {download_url} ({err})");
 

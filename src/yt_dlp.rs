@@ -29,7 +29,6 @@ const YT_DLP_EXE: &str = {
 };
 
 const YT_DLP_ARGS: &[&str] = &[
-	"--dump-json",
 	"-f",
 	"bestvideo[filesize<22MB]+bestaudio[filesize<3MB]/best/bestvideo+bestaudio",
 	"-S",
@@ -164,7 +163,7 @@ impl YtDlp {
 		Ok(Self { tag_name, exe_path })
 	}
 
-	pub async fn download<'a>(&self, url: &str, out_path: &'a Path) -> Result<Cow<'a, Path>, anyhow::Error> {
+	pub async fn download<'a>(&self, url: &str, out_path: &'a Path) -> Result<Option<DownloadedMedia>, anyhow::Error> {
 		log::info!("Downloading {url} to {}", out_path.display());
 
 		let output = Command::new(self.exe_path.as_ref())
@@ -176,30 +175,66 @@ impl YtDlp {
 
 		log::info!("Downloaded {url} to {}", out_path.display());
 
+		if cfg!(debug_assertions) {
+			println!("===== EXIT CODE {} =====", output.status);
+			println!("===== STDOUT =====\n{}\n", String::from_utf8_lossy(&output.stdout));
+			println!("===== STDERR =====\n{}", String::from_utf8_lossy(&output.stderr));
+		}
+
 		if output.status.success() {
 			if out_path.exists() {
-				match (cfg!(debug_assertions), self.video_integrity_check(out_path).await) {
+				let mut out_path = Cow::Borrowed(out_path);
+
+				match (cfg!(debug_assertions), self.video_integrity_check(out_path.as_ref()).await) {
 					(true, Err(err)) => panic!("Video integrity check failed: {err}"),
 					(false, Err(err)) => log::error!("Video integrity check failed: {err}"),
+
 					(_, Ok(false)) => {
 						log::info!("Video appears to be corrupt, re-encoding...");
-						match self.reencode_video(out_path).await {
-							Ok(out_path) => return Ok(Cow::Owned(out_path)),
+
+						match self.reencode_video(out_path.as_ref()).await {
+							Ok(new_out_path) => {
+								out_path = Cow::Owned(new_out_path);
+							}
+
 							Err(err) => log::error!("Failed to re-encode video: {err}"),
 						}
 					}
+
 					(_, Ok(true)) => {}
 				}
-				Ok(Cow::Borrowed(out_path))
+
+				let url = (|| {
+					let stdout = std::str::from_utf8(&output.stdout).ok()?;
+					let dump = serde_json::from_str::<YtDlpJsonDump>(stdout).ok()?;
+
+					if dump.requested_downloads.len() == 1 {
+						Some(dump.requested_downloads[0].url.as_str().into())
+					} else {
+						Some(dump.url.into_boxed_str())
+					}
+				})();
+
+				Ok(Some(DownloadedMedia { path: out_path.into(), url }))
 			} else {
 				Err(anyhow::anyhow!("yt-dlp did not create the file"))
 			}
 		} else {
+			let stdout = String::from_utf8_lossy(&output.stdout);
+
+			if let Cow::Borrowed(stdout) = stdout {
+				// Only if it's valid UTF-8...
+				if stdout.trim() == "null" {
+					// No videos found
+					return Ok(None);
+				}
+			}
+
 			Err(anyhow::anyhow!(
 				"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
 				output.status,
 				String::from_utf8_lossy(&output.stderr),
-				String::from_utf8_lossy(&output.stdout)
+				stdout
 			))
 		}
 	}
@@ -298,25 +333,22 @@ impl YtDlpDaemon {
 		Ok(())
 	}
 
-	pub async fn download(&self, url: &str) -> Result<DownloadedMedia, anyhow::Error> {
+	pub async fn download(&self, url: &str) -> Result<Option<DownloadedMedia>, anyhow::Error> {
 		let url_hash = format!("{:x}.mp4", sha2::Sha256::digest(url));
 		let path = Path::new("yt_dlp_out").join(url_hash).into_boxed_path();
 
-		let download = async {
-			tokio::fs::create_dir_all("yt_dlp_out").await.context("creating yt_dlp_out directory")?;
+		self.update_check().await; // This will complete really quickly and do stuff in the background.
 
-			self.0.yt_dlp.read().await.download(url, &path).await
-		};
+		tokio::fs::create_dir_all("yt_dlp_out").await.context("creating yt_dlp_out directory")?;
 
-		self.update_check().await;
-
-		let path = download.await?;
-
-		Ok(DownloadedMedia { path: path.into() })
+		self.0.yt_dlp.read().await.download(url, &path).await
 	}
 
 	async fn update_check(&self) {
-		let mut last_update_check = self.0.last_update_check.lock().await;
+		let Ok(mut last_update_check) = self.0.last_update_check.try_lock() else {
+			// Another thread is already checking for updates
+			return;
+		};
 
 		if last_update_check.elapsed() > YT_DLP_UPDATE_CHECK_INTERVAL {
 			*last_update_check = Instant::now();
@@ -333,6 +365,7 @@ impl YtDlpDaemon {
 
 pub struct DownloadedMedia {
 	pub path: Box<Path>,
+	pub url: Option<Box<str>>,
 }
 impl Drop for DownloadedMedia {
 	fn drop(&mut self) {
@@ -345,4 +378,15 @@ impl Drop for DownloadedMedia {
 			std::fs::remove_file(&self.path).ok();
 		}
 	}
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct YtDlpJsonDump {
+	requested_downloads: Vec<YtDlpJsonDumpRequestedDownload>,
+	url: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct YtDlpJsonDumpRequestedDownload {
+	url: String,
 }
