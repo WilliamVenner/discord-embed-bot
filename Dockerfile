@@ -4,7 +4,7 @@ WORKDIR /usr/src/app
 
 RUN apt update
 RUN apt install ffmpeg -y
-RUN apt install node -y
+RUN apt install nodejs -y
 
 COPY . .
 
