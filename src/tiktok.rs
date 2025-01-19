@@ -3,6 +3,12 @@ use tokio::{io::AsyncWriteExt, process::Command};
 
 // TODO for slideshows with one image, just output the image
 
+struct SlideshowImage<'a> {
+	url: &'a str,
+	width: u64,
+	height: u64,
+}
+
 pub async fn extract_slideshow_images(photo_id: &str, out: impl AsRef<Path>) -> Result<(), anyhow::Error> {
 	let api_url = format!("https://www.tiktok.com/api/item/detail/?aid=1988&app_language=en&app_name=tiktok_web&browser_language=en-GB&browser_name=Mozilla&browser_online=true&browser_platform=Win32&browser_version=5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML,%20like%20Gecko)%20Chrome%2F132.0.0.0%20Safari%2F537.36&channel=tiktok_web&cookie_enabled=false&coverFormat=2&data_collection_enabled=false&device_id=7461615928682841622&device_platform=web_pc&focus_state=true&from_page=user&history_len=2&is_fullscreen=false&is_page_visible=true&language=en&odinId=7461615911201063958&os=windows&priority_region=&referer=&region=GB&screen_height=1314&screen_width=2562&tz_name=Europe%2FLondon&user_is_login=false&webcast_language=en&itemId={}", photo_id);
 
@@ -47,7 +53,13 @@ pub async fn extract_slideshow_images(photo_id: &str, out: impl AsRef<Path>) -> 
 	let images = (|| api_data.get("itemInfo")?.get("itemStruct")?.get("imagePost")?.get("images")?.as_array())()
 		.ok_or_else(|| anyhow::anyhow!("Failed to extract images"))?
 		.iter()
-		.filter_map(|image| image.get("imageURL")?.get("urlList")?.as_array()?.first()?.as_str())
+		.filter_map(|image| {
+			Some(SlideshowImage {
+				width: image.get("imageWidth")?.as_u64()?,
+				height: image.get("imageHeight")?.as_u64()?,
+				url: image.get("imageURL")?.get("urlList")?.as_array()?.first()?.as_str()?,
+			})
+		})
 		.collect::<Vec<_>>();
 
 	let music = (|| api_data.get("itemInfo")?.get("itemStruct")?.get("music")?.get("playUrl")?.as_str())();
@@ -56,7 +68,7 @@ pub async fn extract_slideshow_images(photo_id: &str, out: impl AsRef<Path>) -> 
 		return Err(anyhow::anyhow!("No images found"));
 	}
 
-	generate_slideshow_video(out, images, music).await?;
+	generate_slideshow_video(out, &images, music).await?;
 
 	Ok(())
 }
@@ -88,7 +100,9 @@ pub fn get_tiktok_photo_id_from_url(url: &str) -> Option<&str> {
 	)
 }
 
-async fn generate_slideshow_video(out: impl AsRef<Path>, images: Vec<&str>, music: Option<&str>) -> Result<(), anyhow::Error> {
+async fn generate_slideshow_video(out: impl AsRef<Path>, images: &[SlideshowImage<'_>], music: Option<&str>) -> Result<(), anyhow::Error> {
+	let (w, h) = images.iter().fold((0, 0), |(w, h), image| (w.max(image.width), h.max(image.height)));
+
 	let mut ffmpeg = Command::new("ffmpeg");
 
 	ffmpeg
@@ -115,8 +129,8 @@ async fn generate_slideshow_video(out: impl AsRef<Path>, images: Vec<&str>, musi
 		"0:v",
 		"-map",
 		"1:a",
-		//"-vf",
-		//"scale=1280:720:force_original_aspect_ratio=decrease:eval=frame,pad=1280:720:-1:-1:eval=frame,format=yuv420p",
+		"-vf",
+		&format!("scale={w}:{h}:force_original_aspect_ratio=decrease:eval=frame,pad={w}:{h}:-1:-1:eval=frame,format=yuv420p"),
 		"-filter_complex",
 		"[1:0] apad",
 		"-shortest",
@@ -128,8 +142,11 @@ async fn generate_slideshow_video(out: impl AsRef<Path>, images: Vec<&str>, musi
 
 	let images = format!(
 		"{}file '{}'\nduration 0",
-		images.iter().map(|url| format!("file '{url}'\nduration 2\n")).collect::<String>(),
-		images.last().unwrap() // Add an extra image to prevent the last image from being cut off
+		images
+			.iter()
+			.map(|image| format!("file '{}'\nduration 2.5\n", image.url))
+			.collect::<String>(),
+		images.last().unwrap().url // Add an extra image to prevent the last image from being cut off
 	);
 
 	ffmpeg.stdin.take().unwrap().write_all(images.as_bytes()).await?;
@@ -146,4 +163,16 @@ async fn generate_slideshow_video(out: impl AsRef<Path>, images: Vec<&str>, musi
 	}
 
 	Ok(())
+}
+
+#[test]
+fn test_slideshow() {
+	std::fs::create_dir_all("yt_dlp_out").unwrap();
+
+	tokio::runtime::Builder::new_current_thread()
+		.enable_all()
+		.build()
+		.unwrap()
+		.block_on(extract_slideshow_images("7460552162892860718", "yt_dlp_out/test.mp4"))
+		.unwrap();
 }
