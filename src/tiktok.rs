@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::{io::AsyncWriteExt, process::Command};
 
 // TODO for slideshows with one image, just output the image
@@ -9,7 +9,7 @@ struct SlideshowImage<'a> {
 	height: u64,
 }
 
-pub async fn extract_slideshow_images(photo_id: &str, out: impl AsRef<Path>) -> Result<(), anyhow::Error> {
+pub async fn extract_slideshow_images(photo_id: &str, out: &Path) -> Result<PathBuf, anyhow::Error> {
 	let api_url = format!("https://www.tiktok.com/api/item/detail/?aid=1988&app_language=en&app_name=tiktok_web&browser_language=en-GB&browser_name=Mozilla&browser_online=true&browser_platform=Win32&browser_version=5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML,%20like%20Gecko)%20Chrome%2F132.0.0.0%20Safari%2F537.36&channel=tiktok_web&cookie_enabled=false&coverFormat=2&data_collection_enabled=false&device_id=7461615928682841622&device_platform=web_pc&focus_state=true&from_page=user&history_len=2&is_fullscreen=false&is_page_visible=true&language=en&odinId=7461615911201063958&os=windows&priority_region=&referer=&region=GB&screen_height=1314&screen_width=2562&tz_name=Europe%2FLondon&user_is_login=false&webcast_language=en&itemId={}", photo_id);
 
 	let xbogus = {
@@ -64,13 +64,45 @@ pub async fn extract_slideshow_images(photo_id: &str, out: impl AsRef<Path>) -> 
 
 	let music = (|| api_data.get("itemInfo")?.get("itemStruct")?.get("music")?.get("playUrl")?.as_str())();
 
-	if images.is_empty() {
-		return Err(anyhow::anyhow!("No images found"));
+	let out = match images.len() {
+		0 => return Err(anyhow::anyhow!("No images found")),
+
+		1 => {
+			let out = out.with_extension("png");
+
+			let ffmpeg = Command::new("ffmpeg")
+				.args(["-i", images[0].url])
+				.arg(&out)
+				.spawn()?
+				.wait_with_output()
+				.await?;
+
+			if !ffmpeg.status.success() {
+				return Err(anyhow::anyhow!(
+					"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
+					ffmpeg.status,
+					String::from_utf8_lossy(&ffmpeg.stderr),
+					String::from_utf8_lossy(&ffmpeg.stdout)
+				));
+			}
+
+			out
+		}
+
+		_ => {
+			let out = out.with_extension("mp4");
+
+			generate_slideshow_video(&out, &images, music).await?;
+
+			out
+		}
+	};
+
+	if !Path::new(&out).is_file() {
+		return Err(anyhow::anyhow!("Failed to generate slideshow - file was not created"));
 	}
 
-	generate_slideshow_video(out, &images, music).await?;
-
-	Ok(())
+	Ok(out)
 }
 
 fn tiktok_http_get(url: &str) -> reqwest::RequestBuilder {
@@ -100,7 +132,7 @@ pub fn get_tiktok_photo_id_from_url(url: &str) -> Option<&str> {
 	)
 }
 
-async fn generate_slideshow_video(out: impl AsRef<Path>, images: &[SlideshowImage<'_>], music: Option<&str>) -> Result<(), anyhow::Error> {
+async fn generate_slideshow_video(out: &Path, images: &[SlideshowImage<'_>], music: Option<&str>) -> Result<(), anyhow::Error> {
 	let (w, h) = images.iter().fold((0, 0), |(w, h), image| (w.max(image.width), h.max(image.height)));
 
 	let mut ffmpeg = Command::new("ffmpeg");
@@ -136,7 +168,7 @@ async fn generate_slideshow_video(out: impl AsRef<Path>, images: &[SlideshowImag
 		"-shortest",
 	]);
 
-	ffmpeg.arg(out.as_ref());
+	ffmpeg.arg(out);
 
 	let mut ffmpeg = ffmpeg.spawn()?;
 

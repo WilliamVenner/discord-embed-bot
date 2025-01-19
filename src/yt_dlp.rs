@@ -325,7 +325,7 @@ impl YtDlpDaemon {
 	}
 
 	pub async fn download(&self, url: &str) -> Result<DownloadedMedia, anyhow::Error> {
-		let path = format!("{}.mp4", uuid::Uuid::new_v4());
+		let path = uuid::Uuid::new_v4().to_string();
 		let path = Path::new("yt_dlp_out").join(path).into_boxed_path();
 
 		tokio::fs::create_dir_all("yt_dlp_out").await.context("creating yt_dlp_out directory")?;
@@ -344,14 +344,17 @@ impl YtDlpDaemon {
 		if let Some(photo_id) = tiktok::get_tiktok_photo_id_from_url(&url) {
 			// TikTok slideshow
 
-			tiktok::extract_slideshow_images(photo_id, &path).await?;
+			let path = tiktok::extract_slideshow_images(photo_id, &path).await?;
 
-			return Ok(DownloadedMedia { path, url: None });
+			return Ok(DownloadedMedia {
+				path: path.into_boxed_path(),
+				url: None,
+			});
 		}
 
 		self.update_check().await; // This will complete really quickly and do stuff in the background.
 
-		self.0.yt_dlp.read().await.download(&url, &path).await
+		self.0.yt_dlp.read().await.download(&url, &path.with_extension("mp4")).await
 	}
 
 	async fn update_check(&self) {
