@@ -12,7 +12,7 @@ RUN npm install
 
 COPY Cargo.toml .
 COPY Cargo.lock .
-COPY src/main.rs ./src/main.rs
+RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
 RUN cargo fetch
 
 COPY . .
