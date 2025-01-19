@@ -1,4 +1,4 @@
-use crate::github;
+use crate::{github, tiktok, USER_AGENT};
 use anyhow::Context;
 use std::{
 	borrow::Cow,
@@ -281,6 +281,7 @@ impl YtDlp {
 }
 
 struct YtDlpDaemonInner {
+	client: reqwest::Client,
 	yt_dlp: RwLock<YtDlp>,
 	last_update_check: Mutex<Instant>,
 }
@@ -296,6 +297,7 @@ impl YtDlpDaemon {
 		}
 
 		Ok(Self(Arc::new(YtDlpDaemonInner {
+			client: reqwest::Client::new(),
 			yt_dlp: RwLock::new(YtDlp::new().await?),
 			last_update_check: Mutex::new(Instant::now()),
 		})))
@@ -326,11 +328,30 @@ impl YtDlpDaemon {
 		let path = format!("{}.mp4", uuid::Uuid::new_v4());
 		let path = Path::new("yt_dlp_out").join(path).into_boxed_path();
 
-		self.update_check().await; // This will complete really quickly and do stuff in the background.
-
 		tokio::fs::create_dir_all("yt_dlp_out").await.context("creating yt_dlp_out directory")?;
 
-		self.0.yt_dlp.read().await.download(url, &path).await
+		let url = self
+			.0
+			.client
+			.get(url)
+			.header("User-Agent", USER_AGENT)
+			.send()
+			.await?
+			.error_for_status()?
+			.url()
+			.to_string();
+
+		if let Some(photo_id) = tiktok::get_tiktok_photo_id_from_url(&url) {
+			// TikTok slideshow
+
+			tiktok::extract_slideshow_images(photo_id, &path).await?;
+
+			return Ok(DownloadedMedia { path, url: None });
+		}
+
+		self.update_check().await; // This will complete really quickly and do stuff in the background.
+
+		self.0.yt_dlp.read().await.download(&url, &path).await
 	}
 
 	async fn update_check(&self) {

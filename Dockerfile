@@ -4,10 +4,12 @@ WORKDIR /usr/src/app
 
 RUN apt update
 RUN apt install ffmpeg -y
+RUN apt install node -y
 
 COPY . .
 
 RUN cargo fetch
+RUN npm install
 
 COPY . .
 

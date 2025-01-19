@@ -4,3 +4,4 @@ yt_dlp_out/
 discord_bot_token
 config.json
 .env
+node_modules/
