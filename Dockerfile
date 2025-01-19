@@ -8,11 +8,12 @@ RUN apt install npm nodejs -y
 
 COPY package-lock.json .
 COPY package.json .
+RUN npm install
+
 COPY Cargo.toml .
 COPY Cargo.lock .
-
+COPY src/main.rs ./src/main.rs
 RUN cargo fetch
-RUN npm install
 
 COPY . .
 
