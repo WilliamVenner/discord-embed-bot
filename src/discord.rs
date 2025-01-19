@@ -29,6 +29,11 @@ struct DiscordBot {
 }
 impl DiscordBot {
 	async fn generic_message(&self, ctx: Context, mut msg: Message, config: Arc<CompiledConfig>) {
+		// Ignore NotSoBot .dl commands
+		if msg.content.trim().starts_with(".dl ") {
+			return;
+		}
+
 		let mut download_urls = config
 			.link_regexes
 			.iter()
