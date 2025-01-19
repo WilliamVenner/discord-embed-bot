@@ -11,8 +11,6 @@ COPY . .
 RUN cargo fetch
 RUN npm install
 
-COPY . .
-
 ENV RUSTFLAGS="-Ctarget-cpu=native"
 RUN cargo build --release
 

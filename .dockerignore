@@ -1,2 +1,12 @@
 config.json
 discord_bot_token
+Dockerfile
+/target
+yt_dlp_exe/
+yt_dlp_out/
+node_modules/
+.vscode/
+*.sh
+*.service
+.gitignore
+.editorconfig
