@@ -12,8 +12,7 @@ RUN npm install
 
 COPY Cargo.toml .
 COPY Cargo.lock .
-RUN mkdir src
-RUN echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
+RUN mkdir src && echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
 RUN cargo fetch
 
 COPY . .
