@@ -147,7 +147,7 @@ async fn generate_slideshow_video(out: &Path, images: &[SlideshowImage<'_>], mus
 			"-safe",
 			"0",
 			"-protocol_whitelist",
-			"file,http,tcp,https,tls,fd",
+			"file,http,tcp,https,tls,fd,pipe",
 			"-i",
 			"-",
 		]);
