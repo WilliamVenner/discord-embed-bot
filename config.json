@@ -1,0 +1,14 @@
+{
+  "link_regexes": [
+    "https?://(?:(?:old\\.|www\\.)?reddit\\.com|v\\.redd\\.it)/\\S+",
+    "https?://(?:www\\.|vm\\.)?tiktok\\.com/\\S+",
+    "https?://(?:www\\.)?(?:twitter|x)\\.com/\\S+/status(?:es)?/(?:\\d+)(?:\\S+)?",
+    "https?://(?:www\\.)?instagram\\.com/\\S+",
+    "https?://(?:www\\.)?(?:facebook|fb)\\.com/(?:story\\b|reel/|share/)\\S+"
+  ],
+  "admin_guild": {
+    "guild_id": "",
+    "log_channel_id": "",
+    "config_channel_id": ""
+  }
+}
