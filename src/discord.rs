@@ -124,14 +124,25 @@ impl DiscordBot {
 			}
 		}
 
-		if let Err(err) = result {
-			log::error!("Failed to send {download_url} ({err} {err:?})");
-			msg.react(&ctx, '❌').await.ok();
-			return;
-		}
+		match result {
+			Err(serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(serenity::http::ErrorResponse {
+				status_code: serenity::http::StatusCode::PAYLOAD_TOO_LARGE,
+				..
+			}))) => {
+				// TODO try to compress the video further
+				msg.react(&ctx, '🫃').await.ok();
+			}
 
-		if replace_embed.is_some() {
-			msg.edit(ctx, EditMessage::new().suppress_embeds(true)).await.ok();
+			Err(err) => {
+				log::error!("Failed to send {download_url} ({err} {err:?})");
+				msg.react(&ctx, '❌').await.ok();
+			}
+
+			Ok(_) => {
+				if replace_embed.is_some() {
+					msg.edit(ctx, EditMessage::new().suppress_embeds(true)).await.ok();
+				}
+			}
 		}
 	}
 
