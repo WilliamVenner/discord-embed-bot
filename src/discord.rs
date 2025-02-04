@@ -106,24 +106,6 @@ impl DiscordBot {
 
 		drop(typing);
 
-		if let Err(err) = &result {
-			if err.to_string().as_str() == "Request entity too large" {
-				if let Some(raw_url) = media.url.as_deref() {
-					let reply = CreateMessage::new().content(format!("-# File was too large to upload\n{raw_url}"));
-
-					if let Err(err) = msg.channel_id.send_message(&ctx, reply).await {
-						log::error!("Failed to send secondary \"file was too large\" message for {download_url} ({err} {err:?})");
-						msg.react(&ctx, '❌').await.ok();
-					} else {
-						return;
-					}
-				} else {
-					log::error!("Failed to send secondary \"file was too large\" message for {download_url} (no raw URL found)");
-					msg.react(&ctx, '❌').await.ok();
-				}
-			}
-		}
-
 		match result {
 			Err(serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(serenity::http::ErrorResponse {
 				status_code: serenity::http::StatusCode::PAYLOAD_TOO_LARGE,
