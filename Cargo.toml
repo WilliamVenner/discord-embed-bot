@@ -7,10 +7,6 @@ authors = ["William Venner <william@venner.io>"]
 repository = "https://github.com/WilliamVenner/discord-embed-bot"
 publish = false
 
-[profile.release]
-codegen-units = 1
-lto = "thin"
-
 [dependencies]
 tokio = { version = "1", features = ["full", "parking_lot", "rt-multi-thread"] }
 anyhow = "1"
