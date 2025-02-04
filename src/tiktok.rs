@@ -64,39 +64,13 @@ pub async fn extract_slideshow_images(photo_id: &str, out: &Path) -> Result<Path
 
 	let music = (|| api_data.get("itemInfo")?.get("itemStruct")?.get("music")?.get("playUrl")?.as_str())();
 
-	let out = match images.len() {
-		0 => return Err(anyhow::anyhow!("No images found")),
+	if images.is_empty() {
+		return Err(anyhow::anyhow!("No images found"));
+	}
 
-		1 => {
-			let out = out.with_extension("png");
+	let out = out.with_extension("mp4");
 
-			let ffmpeg = Command::new("ffmpeg")
-				.args(["-i", images[0].url])
-				.arg(&out)
-				.spawn()?
-				.wait_with_output()
-				.await?;
-
-			if !ffmpeg.status.success() {
-				return Err(anyhow::anyhow!(
-					"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
-					ffmpeg.status,
-					String::from_utf8_lossy(&ffmpeg.stderr),
-					String::from_utf8_lossy(&ffmpeg.stdout)
-				));
-			}
-
-			out
-		}
-
-		_ => {
-			let out = out.with_extension("mp4");
-
-			generate_slideshow_video(&out, &images, music).await?;
-
-			out
-		}
-	};
+	generate_slideshow_video(&out, &images, music).await?;
 
 	if !Path::new(&out).is_file() {
 		return Err(anyhow::anyhow!("Failed to generate slideshow - file was not created"));
