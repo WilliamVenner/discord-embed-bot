@@ -12,12 +12,14 @@ RUN npm install
 
 COPY Cargo.toml .
 COPY Cargo.lock .
+
 RUN mkdir src && echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
-RUN cargo fetch
+
+ENV RUSTFLAGS="-Ctarget-cpu=native"
+RUN cargo build --release
 
 COPY . .
 
-ENV RUSTFLAGS="-Ctarget-cpu=native"
 RUN cargo build --release
 
 ENTRYPOINT ["./target/release/discord-embed-bot"]
