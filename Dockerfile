@@ -20,6 +20,9 @@ RUN cargo build --release
 
 COPY . .
 
+# Make sure Cargo sees the modifications
+RUN find src -exec touch {} +
+
 RUN cargo build --release
 
 ENTRYPOINT ["./target/release/discord-embed-bot"]
