@@ -179,6 +179,6 @@ fn test_slideshow() {
 		.enable_all()
 		.build()
 		.unwrap()
-		.block_on(extract_slideshow_images("7460552162892860718", "yt_dlp_out/test.mp4"))
+		.block_on(extract_slideshow_images("7460552162892860718", Path::new("yt_dlp_out/test.mp4")))
 		.unwrap();
 }

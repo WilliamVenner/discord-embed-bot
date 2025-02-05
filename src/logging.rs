@@ -55,7 +55,9 @@ impl log::Log for DiscordLogger {
 			let channel_id = *channel_id;
 			let ctx = ctx.clone();
 			rt.spawn(async move {
-				ctx.http.send_message(channel_id, Vec::new(), &msg).await.ok();
+				if let Err(err) = ctx.http.send_message(channel_id, Vec::new(), &msg).await {
+					eprintln!("Failed to send log message to Discord: {err}");
+				}
 			});
 		}
 	}
