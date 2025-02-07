@@ -74,9 +74,16 @@ impl DiscordBot {
 		let media = match self.app_ctx.yt_dlp.download(download_url).await {
 			Ok(media) => media,
 
-			Err(err) => {
-				log::error!("Failed to download {download_url} ({err})");
-				return;
+			Err(_) => {
+				// Try again
+				match self.app_ctx.yt_dlp.download(download_url).await {
+					Ok(media) => media,
+
+					Err(err) => {
+						log::error!("Failed to download {download_url} ({err})");
+						return;
+					}
+				}
 			}
 		};
 
