@@ -11,6 +11,8 @@ use serenity::{
 };
 use std::{future::Future, sync::Arc, time::Duration};
 
+pub const DISCORD_FILE_SIZE_LIMIT: u64 = 10 * 1024 * 1024;
+
 fn discord_bot_permissions() -> GatewayIntents {
 	GatewayIntents::GUILD_MESSAGES
 		| GatewayIntents::MESSAGE_CONTENT
@@ -37,10 +39,11 @@ impl DiscordBot {
 		let mut download_urls = config
 			.link_regexes
 			.iter()
-			.flat_map(|regex| regex.find_iter(&msg.content))
-			.map(|match_| match_.as_str());
+			.flat_map(|regex| regex.regex.find_iter(&msg.content).map(move |match_| (regex, match_.as_str())))
+			.collect::<Vec<_>>()
+			.into_iter();
 
-		let Some(download_url) = download_urls.next() else {
+		let Some((download_url_regex, download_url)) = download_urls.next() else {
 			return;
 		};
 
@@ -71,65 +74,123 @@ impl DiscordBot {
 			}
 		};
 
-		let media = match self.app_ctx.yt_dlp.download(download_url).await {
+		let mut result = None;
+		for _ in 0..2 {
+			result = Some(self.app_ctx.yt_dlp.download(download_url).await);
+
+			if result.as_ref().unwrap().is_ok() {
+				break;
+			}
+		}
+
+		let media = match result.unwrap() {
 			Ok(media) => media,
-
-			Err(_) => {
-				// Try again
-				match self.app_ctx.yt_dlp.download(download_url).await {
-					Ok(media) => media,
-
-					Err(err) => {
-						log::error!("Failed to download {download_url} ({err})");
-						return;
-					}
-				}
+			Err(err) => {
+				log::error!("Failed to download {download_url} ({err})");
+				return;
 			}
 		};
 
-		let file = match CreateAttachment::path(&media.path).await {
-			Ok(file) => file,
+		let media_size = match tokio::fs::metadata(&media.path).await {
+			Ok(metadata) => metadata.len(),
 			Err(err) => {
-				log::error!("Failed to create attachment for {download_url} ({err})");
+				log::error!("Failed to get output file metadata for {download_url} ({err})");
 				msg.react(&ctx, '❌').await.ok();
 				return;
 			}
 		};
 
-		let mut reply = CreateMessage::new()
-			.reference_message(&msg)
-			.add_file(file)
-			.allowed_mentions(CreateAllowedMentions::new());
-
-		if let Some(embed) = &mut replace_embed {
-			embed.image = None;
-			embed.video = None;
-			embed.thumbnail = None;
-			embed.provider = None;
-			reply = reply.add_embed(CreateEmbed::from(embed.clone()));
+		enum UploadMediaError {
+			TooLarge,
+			Other(serenity::Error),
 		}
 
-		let result = msg.channel_id.send_message(&ctx, reply.clone()).await.map(|_| ());
+		let mut result = match media_size > DISCORD_FILE_SIZE_LIMIT {
+			true => Err(UploadMediaError::TooLarge),
+			false => {
+				let file = match CreateAttachment::path(&media.path).await {
+					Ok(file) => file,
+					Err(err) => {
+						log::error!("Failed to create attachment for {download_url} ({err})");
+						msg.react(&ctx, '❌').await.ok();
+						return;
+					}
+				};
+
+				let mut reply = CreateMessage::new()
+					.reference_message(&msg)
+					.add_file(file)
+					.allowed_mentions(CreateAllowedMentions::new());
+
+				if let Some(embed) = &mut replace_embed {
+					embed.image = None;
+					embed.video = None;
+					embed.thumbnail = None;
+					embed.provider = None;
+					reply = reply.add_embed(CreateEmbed::from(embed.clone()));
+				}
+
+				msg.channel_id
+					.send_message(&ctx, reply.clone())
+					.await
+					.map(Some)
+					.map_err(UploadMediaError::Other)
+			}
+		};
+
+		if let (
+			Err(
+				UploadMediaError::TooLarge
+				| UploadMediaError::Other(serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(serenity::http::ErrorResponse {
+					status_code: serenity::http::StatusCode::PAYLOAD_TOO_LARGE,
+					..
+				}))),
+			),
+			fixup,
+		) = (result.as_ref(), download_url_regex.fixup.as_deref())
+		{
+			if let Some(fixed_up) = fixup
+				.map(|fixup| download_url_regex.regex.replace(download_url, fixup))
+				.filter(|fixed_up| fixed_up != download_url)
+			{
+				result = msg
+					.channel_id
+					.send_message(
+						&ctx,
+						CreateMessage::new()
+							.reference_message(&msg)
+							.allowed_mentions(CreateAllowedMentions::new())
+							.content(fixed_up),
+					)
+					.await
+					.map(|_| None)
+					.map_err(UploadMediaError::Other);
+			}
+		}
 
 		drop(typing);
 
 		match result {
-			Err(serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(serenity::http::ErrorResponse {
-				status_code: serenity::http::StatusCode::PAYLOAD_TOO_LARGE,
-				..
-			}))) => {
-				// TODO try to compress the video further
+			Err(
+				UploadMediaError::TooLarge
+				| UploadMediaError::Other(serenity::Error::Http(serenity::http::HttpError::UnsuccessfulRequest(serenity::http::ErrorResponse {
+					status_code: serenity::http::StatusCode::PAYLOAD_TOO_LARGE,
+					..
+				}))),
+			) => {
 				msg.react(&ctx, '🫃').await.ok();
 			}
 
-			Err(err) => {
+			Err(UploadMediaError::Other(err)) => {
 				log::error!("Failed to send {download_url} ({err} {err:?})");
 				msg.react(&ctx, '❌').await.ok();
 			}
 
-			Ok(_) => {
-				if replace_embed.is_some() {
-					msg.edit(ctx, EditMessage::new().suppress_embeds(true)).await.ok();
+			Ok(new_msg) => {
+				if replace_embed.is_some() && msg.edit(&ctx, EditMessage::new().suppress_embeds(true)).await.is_err() {
+					if let Some(mut new_msg) = new_msg {
+						new_msg.edit(&ctx, EditMessage::new().suppress_embeds(true)).await.ok();
+					}
 				}
 			}
 		}

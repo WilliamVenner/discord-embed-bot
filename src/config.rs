@@ -13,7 +13,7 @@ use tokio::{
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
-	pub link_regexes: Box<[Box<str>]>,
+	pub link_regexes: Box<[LinkRegex]>,
 	pub admin_guild: Option<AdminGuild>,
 }
 impl Default for Config {
@@ -25,6 +25,12 @@ impl Default for Config {
 	}
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LinkRegex {
+	pub regex: String,
+	pub fixup: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AdminGuild {
 	pub guild_id: GuildId,
@@ -33,7 +39,7 @@ pub struct AdminGuild {
 }
 
 pub struct CompiledConfig {
-	pub link_regexes: Box<[regex::Regex]>,
+	pub link_regexes: Box<[CompiledLinkRegex]>,
 	pub admin_guild: Option<AdminGuild>,
 }
 impl Default for CompiledConfig {
@@ -49,13 +55,23 @@ impl TryFrom<&Config> for CompiledConfig {
 			link_regexes: config
 				.link_regexes
 				.iter()
-				.map(|regex| regex::RegexBuilder::new(regex).case_insensitive(true).build())
+				.map(|regex| {
+					Ok::<_, Self::Error>(CompiledLinkRegex {
+						regex: regex::RegexBuilder::new(&regex.regex).case_insensitive(true).build()?,
+						fixup: regex.fixup.as_deref().map(Into::into),
+					})
+				})
 				.collect::<Result<Vec<_>, _>>()?
 				.into_boxed_slice(),
 
 			admin_guild: config.admin_guild.clone(),
 		})
 	}
+}
+
+pub struct CompiledLinkRegex {
+	pub regex: regex::Regex,
+	pub fixup: Option<Box<str>>,
 }
 
 #[derive(Clone)]

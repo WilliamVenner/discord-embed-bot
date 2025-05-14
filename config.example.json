@@ -1,14 +1,33 @@
 {
-  "link_regexes": [
-    "https?://(?:(?:old\\.|www\\.)?reddit\\.com|v\\.redd\\.it)/\\S+",
-    "https?://(?:www\\.|vm\\.)?tiktok\\.com/\\S+",
-    "https?://(?:www\\.)?(?:twitter|x)\\.com/\\S+/status(?:es)?/(?:\\d+)(?:\\S+)?",
-    "https?://(?:www\\.)?instagram\\.com/\\S+",
-    "https?://(?:www\\.)?(?:facebook|fb)\\.com/(?:story\\b|reel/|share/)\\S+"
-  ],
-  "admin_guild": {
-    "guild_id": "",
-    "log_channel_id": "",
-    "config_channel_id": ""
-  }
+	"link_regexes": [
+		{
+			"regex": "https?://(?:[^\\.]+\\.)?reddit\\.com/(\\S+)",
+			"fixup": "https://rxddit.com/$1"
+		},
+		{
+			"regex": "https?://(?:[^\\.]+\\.)?v\\.redd\\.it/\\S+",
+			"fixup": null
+		},
+		{
+			"regex": "(https?://(?:[^\\.]+\\.)?tikt)o(k\\.com/\\S+)",
+			"fixup": "${1}x${2}"
+		},
+		{
+			"regex": "(https?://(?:[^\\.]+\\.)?)(?:twitter|x)\\.com/(\\S+/status(?:es)?/(?:\\d+)(?:\\S+)?)",
+			"fixup": "${1}fixupx.com/${2}"
+		},
+		{
+			"regex": "(https?://(?:[^\\.]+\\.)?)(instagram\\.com/\\S+)",
+			"fixup": "${1}dd${2}"
+		},
+		{
+			"regex": "https?://(?:[^\\.]+\\.)?(?:facebook|fb)\\.com/(?:story\\b|reel/|share/)\\S+",
+			"fixup": null
+		}
+	],
+	"admin_guild": {
+		"guild_id": "",
+		"log_channel_id": "",
+		"config_channel_id": ""
+	}
 }

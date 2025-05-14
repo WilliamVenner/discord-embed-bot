@@ -1,4 +1,4 @@
-use crate::{github, tiktok, USER_AGENT};
+use crate::{ffprobe::MediaProbe, github, tiktok, USER_AGENT};
 use anyhow::Context;
 use std::{
 	borrow::Cow,
@@ -29,7 +29,7 @@ const YT_DLP_EXE: &str = {
 
 const YT_DLP_ARGS: &[&str] = &[
 	"-f",
-	"bestvideo[filesize<22MB]+bestaudio[filesize<3MB]/best/bestvideo+bestaudio",
+	"http*[filesize<10M]/best[filesize<10MB]/http*[filesize<8M]+http*[filesize<2M]/http*[filesize<8M]/bestvideo[filesize<8MB]+bestaudio[filesize<2MB]/bestvideo[filesize<8MB]+bestaudio/best/bestvideo+bestaudio",
 	"-S",
 	"vcodec:h264",
 	"--merge-output-format",
@@ -162,7 +162,7 @@ impl YtDlp {
 		Ok(Self { tag_name, exe_path })
 	}
 
-	pub async fn download<'a>(&self, url: &str, out_path: &'a Path) -> Result<DownloadedMedia, anyhow::Error> {
+	pub async fn download(&self, url: &str, out_path: &Path) -> Result<DownloadedMedia, anyhow::Error> {
 		log::info!("Downloading {url} to {}", out_path.display());
 
 		let output = Command::new(self.exe_path.as_ref())
@@ -180,83 +180,101 @@ impl YtDlp {
 			println!("===== STDERR =====\n{}", String::from_utf8_lossy(&output.stderr));
 		}
 
-		if output.status.success() {
-			if out_path.exists() {
-				let mut out_path = Cow::Borrowed(out_path);
-
-				match (cfg!(debug_assertions), self.video_integrity_check(out_path.as_ref()).await) {
-					(true, Err(err)) => panic!("Video integrity check failed: {err}"),
-					(false, Err(err)) => log::error!("Video integrity check failed: {err}"),
-
-					(_, Ok(false)) => {
-						log::info!("Video appears to be corrupt, re-encoding...");
-
-						match self.reencode_video(out_path.as_ref()).await {
-							Ok(new_out_path) => {
-								out_path = Cow::Owned(new_out_path);
-							}
-
-							Err(err) => log::error!("Failed to re-encode video: {err}"),
-						}
-					}
-
-					(_, Ok(true)) => {}
-				}
-
-				let url = (|| {
-					let stdout = std::str::from_utf8(&output.stdout).ok()?;
-					let dump = serde_json::from_str::<YtDlpJsonDump>(stdout).ok()?;
-
-					if dump.requested_downloads.len() == 1 {
-						Some(dump.requested_downloads[0].url.as_str().into())
-					} else {
-						Some(dump.url.into_boxed_str())
-					}
-				})();
-
-				Ok(DownloadedMedia { path: out_path.into(), url })
-			} else {
-				Err(anyhow::anyhow!("yt-dlp did not create the file"))
-			}
-		} else {
-			Err(anyhow::anyhow!(
+		if !output.status.success() {
+			return Err(anyhow::anyhow!(
 				"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
 				output.status,
 				String::from_utf8_lossy(&output.stderr),
 				String::from_utf8_lossy(&output.stdout)
-			))
-		}
-	}
-
-	async fn video_integrity_check(&self, path: &Path) -> Result<bool, std::io::Error> {
-		let output = Command::new(if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" })
-			.arg(path)
-			.output()
-			.await?;
-
-		let stdout = String::from_utf8_lossy(&output.stdout);
-		let stdout = stdout.as_ref();
-
-		let stderr = String::from_utf8_lossy(&output.stderr);
-		let stderr = stderr.as_ref();
-
-		if stderr.contains("Packet corrupt") || stdout.contains("Packet corrupt") {
-			return Ok(false);
+			));
+		} else if !out_path.exists() {
+			return Err(anyhow::anyhow!("yt-dlp did not create the file"));
 		}
 
-		Ok(true)
+		let mut out_path = Cow::Borrowed(out_path);
+
+		let reencode_duration = match MediaProbe::get(out_path.as_ref()).await? {
+			MediaProbe::Probed {
+				is_discord_compatible: true, ..
+			} => None,
+
+			MediaProbe::Probed {
+				is_discord_compatible: false,
+				duration,
+			} => Some(Some(duration)),
+
+			MediaProbe::Corrupt => Some(None),
+		};
+
+		if let Some(reencode_duration) = reencode_duration {
+			log::info!("Video is corrupt or incompatible with Discord, re-encoding...");
+
+			match self.reencode_video(out_path.as_ref(), reencode_duration).await {
+				Ok(new_out_path) => {
+					out_path = Cow::Owned(new_out_path);
+
+					log::info!(
+						"Successfully re-encoded video. New size: {}",
+						tokio::fs::metadata(out_path.as_ref()).await.map(|m| m.len()).unwrap_or(0)
+					);
+
+					if cfg!(debug_assertions) {
+						let reencoded_probe = MediaProbe::get(out_path.as_ref()).await;
+						assert!(
+							matches!(
+								reencoded_probe,
+								Ok(MediaProbe::Probed {
+									is_discord_compatible: true,
+									..
+								})
+							),
+							"Re-encoded video is not compatible with Discord: {reencoded_probe:#?}"
+						);
+					}
+				}
+
+				Err(ReencodeVideoError::Io(err)) => log::error!("Failed to re-encode video: {err}"),
+
+				Err(ReencodeVideoError::BitrateTooLow) => log::warn!("Bitrate too low for this video, re-encoding skipped"),
+			}
+		}
+
+		let url = (|| {
+			let stdout = std::str::from_utf8(&output.stdout).ok()?;
+			let dump = serde_json::from_str::<YtDlpJsonDump>(stdout).ok()?;
+
+			if dump.requested_downloads.len() == 1 {
+				Some(dump.requested_downloads[0].url.as_str().into())
+			} else {
+				Some(dump.url.into_boxed_str())
+			}
+		})();
+
+		Ok(DownloadedMedia { path: out_path.into(), url })
 	}
 
-	async fn reencode_video(&self, path: &Path) -> Result<PathBuf, std::io::Error> {
+	async fn reencode_video(&self, path: &Path, reencode_duration: Option<Duration>) -> Result<PathBuf, ReencodeVideoError> {
 		let reencoded_path = path.with_file_name(format!("{}_reencoded.mp4", path.file_stem().unwrap().to_string_lossy()));
 
-		let output = Command::new(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" })
-			.arg("-i")
+		let bitrates = reencode_duration.map(|duration| Self::calculate_bitrates(10.0, duration.as_secs_f64()));
+
+		let mut cmd = Command::new(if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" });
+
+		cmd.arg("-i")
 			.arg(path)
-			.args(["-vcodec", "libx264", "-acodec", "aac"])
-			.arg(&reencoded_path)
-			.output()
-			.await?;
+			.args(["-vcodec", "libx264", "-acodec", "aac", "-movflags", "+faststart"]);
+
+		if let Some((video_bitrate_kbps, audio_bitrate_kbps)) = bitrates {
+			if video_bitrate_kbps < 800.0 {
+				return Err(ReencodeVideoError::BitrateTooLow);
+			}
+
+			cmd.args(["-b:v", &format!("{video_bitrate_kbps:.0}k"), "-b:a", &format!("{audio_bitrate_kbps:.0}k")]);
+		} else {
+			cmd.args(["-crf", "23"]); // Hope for the best
+		}
+
+		let output = cmd.arg(&reencoded_path).output().await.map_err(ReencodeVideoError::Io)?;
 
 		if output.status.success() && reencoded_path.is_file() {
 			match (cfg!(debug_assertions), tokio::fs::remove_file(path).await) {
@@ -267,7 +285,7 @@ impl YtDlp {
 
 			Ok(reencoded_path)
 		} else {
-			Err(std::io::Error::new(
+			Err(ReencodeVideoError::Io(std::io::Error::new(
 				std::io::ErrorKind::Other,
 				format!(
 					"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
@@ -275,9 +293,33 @@ impl YtDlp {
 					String::from_utf8_lossy(&output.stderr),
 					String::from_utf8_lossy(&output.stdout)
 				),
-			))
+			)))
 		}
 	}
+
+	fn calculate_bitrates(target_size_mb: f64, duration_seconds: f64) -> (f64, f64) {
+		let bits_per_byte = 8.0;
+		let bytes_per_mb = 1024.0 * 1024.0;
+		let target_size_bits = target_size_mb * bytes_per_mb * bits_per_byte;
+
+		// Reserve some bitrate for audio (AAC ~128 kbps)
+		let audio_bitrate_kbps = 128.0;
+		let audio_bitrate_bps = audio_bitrate_kbps * 1000.0;
+
+		// Calculate total bitrate budget (bits per second)
+		let total_bitrate_bps = target_size_bits / duration_seconds;
+
+		// Subtract audio to get video bitrate
+		let video_bitrate_bps = total_bitrate_bps - audio_bitrate_bps;
+		let video_bitrate_kbps = video_bitrate_bps / 1000.0;
+
+		(video_bitrate_kbps, audio_bitrate_kbps)
+	}
+}
+
+enum ReencodeVideoError {
+	Io(std::io::Error),
+	BitrateTooLow,
 }
 
 struct YtDlpDaemonInner {

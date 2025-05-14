@@ -12,6 +12,7 @@ use yt_dlp::YtDlpDaemon;
 mod cmd;
 mod config;
 mod discord;
+mod ffprobe;
 mod github;
 mod logging;
 mod tiktok;
