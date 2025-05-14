@@ -16,7 +16,16 @@ pub async fn register(ctx: &Context) -> Result<(), anyhow::Error> {
 				serenity::all::CommandOptionType::String,
 				"url",
 				"URL of the video",
-			)),
+			))
+			.kind(serenity::all::CommandType::ChatInput)
+			.add_integration_type(serenity::all::InstallationContext::User)
+			.add_integration_type(serenity::all::InstallationContext::Guild)
+			.contexts(vec![
+				serenity::model::application::InteractionContext::Guild,
+				serenity::model::application::InteractionContext::BotDm,
+				serenity::model::application::InteractionContext::PrivateChannel,
+			])
+			.default_member_permissions(serenity::all::Permissions::SEND_MESSAGES),
 	)
 	.await?;
 
