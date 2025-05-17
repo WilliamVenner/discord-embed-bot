@@ -64,6 +64,7 @@ impl DiscordBot {
 						}) if *id == msg.id => Some(if embeds.len() == 1 { Some(embeds[0].clone()) } else { None }),
 						_ => None,
 					});
+
 					match tokio::time::timeout(Duration::from_millis(2000), message_updates.next()).await {
 						Ok(Some(Some(embed))) => Some(embed),
 						_ => None,
@@ -240,7 +241,7 @@ impl EventHandler for DiscordBot {
 		let config = self.app_ctx.config.get().await;
 
 		if let Some(admin_guild) = &config.admin_guild {
-			logging::connect_discord(admin_guild.log_channel_id, ctx.clone()).await;
+			logging::connect_discord(admin_guild.log_channel_id, ctx.http.clone()).await;
 		}
 	}
 
