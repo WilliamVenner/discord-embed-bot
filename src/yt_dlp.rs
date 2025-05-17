@@ -372,16 +372,27 @@ impl YtDlpDaemon {
 
 		tokio::fs::create_dir_all("yt_dlp_out").await.context("creating yt_dlp_out directory")?;
 
-		let url = self
-			.0
-			.client
-			.get(url)
-			.header("User-Agent", USER_AGENT)
-			.send()
-			.await?
-			.error_for_status()?
-			.url()
-			.to_string();
+		let url = async {
+			Ok(self
+				.0
+				.client
+				.head(url)
+				.header("User-Agent", USER_AGENT)
+				.send()
+				.await?
+				.error_for_status()?
+				.url()
+				.to_string())
+		}
+		.await
+		.map(Cow::Owned)
+		.unwrap_or_else(|err: reqwest::Error| {
+			if cfg!(debug_assertions) {
+				log::warn!("Failed to follow redirects: {err}");
+			}
+
+			Cow::Borrowed(url)
+		});
 
 		if let Some(photo_id) = tiktok::get_tiktok_photo_id_from_url(&url) {
 			// TikTok slideshow

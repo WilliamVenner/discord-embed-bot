@@ -6,7 +6,7 @@ type AppLogger = pretty_env_logger::env_logger::Logger;
 static LOGGER: OnceLock<DiscordLogger> = OnceLock::new();
 
 struct DiscordLoggerContext {
-	ctx: Context,
+	ctx: Context, // FIXME: this is dead by the time we log something
 	channel_id: ChannelId,
 	rt: tokio::runtime::Handle,
 }

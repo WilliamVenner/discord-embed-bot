@@ -86,7 +86,7 @@ impl DiscordBot {
 		let media = match result.unwrap() {
 			Ok(media) => media,
 			Err(err) => {
-				log::error!("Failed to download {download_url} ({err})");
+				log::error!("Failed to download {download_url} ({err}) [3]");
 				return;
 			}
 		};

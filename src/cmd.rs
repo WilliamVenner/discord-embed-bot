@@ -51,7 +51,7 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 		.await?;
 
 	let media = app_ctx.yt_dlp.download(download_url).await.map_err(|err| {
-		log::error!("Failed to download {download_url} ({err})");
+		log::error!("Failed to download {download_url} ({err}) [1]");
 		err
 	});
 
@@ -61,7 +61,7 @@ pub async fn run(app_ctx: &AppContext, ctx: &Context, command: &CommandInteracti
 			match &media {
 				Ok(media) => CreateInteractionResponseFollowup::new().add_file(CreateAttachment::path(&media.path).await?),
 				Err(err) => {
-					log::error!("Failed to download {download_url} ({err})");
+					log::error!("Failed to download {download_url} ({err}) [2]");
 
 					CreateInteractionResponseFollowup::new()
 						.ephemeral(true)
