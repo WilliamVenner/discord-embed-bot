@@ -13,7 +13,7 @@ RUN npm install
 COPY Cargo.toml .
 COPY Cargo.lock .
 
-RUN mkdir src && echo "fn main() {println!(\"if you see this, the build broke\")}" > src/main.rs
+RUN mkdir src && echo "fn main() {println!(\"if you see this when RUNNING the bot, the build broke\")}" > src/main.rs
 
 ENV RUSTFLAGS="-Ctarget-cpu=native"
 RUN cargo build --release
