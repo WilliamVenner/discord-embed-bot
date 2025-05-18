@@ -88,6 +88,7 @@ impl DiscordBot {
 			Ok(media) => media,
 			Err(err) => {
 				log::error!("Failed to download {download_url} ({err}) [3]");
+				msg.react(&ctx, '❌').await.ok();
 				return;
 			}
 		};
@@ -295,6 +296,15 @@ impl DiscordBotDaemon {
 					let mut client = Client::builder(&discord_bot_token, discord_bot_permissions())
 						.event_handler(bot.clone())
 						.await?;
+
+					/*
+					client.http = std::sync::Arc::new(
+						serenity::http::HttpBuilder::new(&discord_bot_token)
+							.client(reqwest::Client::builder().http1_only().use_rustls_tls().build().unwrap())
+							.proxy("http://127.0.0.1:8888")
+							.build(),
+					);
+					*/
 
 					client.start().await
 				}
