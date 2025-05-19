@@ -115,6 +115,17 @@ impl ConfigDaemon {
 		})))
 	}
 
+	pub async fn dump(&self) -> Result<String, anyhow::Error> {
+		let mut store = self.0.store.lock().await;
+
+		let mut dump = String::new();
+
+		store.file.seek(std::io::SeekFrom::Start(0)).await?;
+		store.file.read_to_string(&mut dump).await?;
+
+		Ok(dump)
+	}
+
 	pub async fn edit(&self, new: &str) -> Result<(), anyhow::Error> {
 		let config = serde_json::from_str(new)?;
 		let compiled_config = CompiledConfig::try_from(&config)?;

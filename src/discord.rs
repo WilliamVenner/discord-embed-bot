@@ -201,6 +201,14 @@ impl DiscordBot {
 	async fn admin_config_message(&self, ctx: Context, msg: Message, _config: Arc<CompiledConfig>) {
 		let mut content = msg.content.as_str();
 
+		if content == "!dump" {
+			msg.reply(ctx, &self.app_ctx.config.dump().await.unwrap_or_else(|err| format!("ERROR: {err}")))
+				.await
+				.ok();
+
+			return;
+		}
+
 		content = content.trim();
 
 		content = content
