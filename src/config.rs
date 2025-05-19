@@ -29,6 +29,7 @@ impl Default for Config {
 pub struct LinkRegex {
 	pub regex: String,
 	pub fixup: Option<String>,
+	pub no_video: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -59,6 +60,7 @@ impl TryFrom<&Config> for CompiledConfig {
 					Ok::<_, Self::Error>(CompiledLinkRegex {
 						regex: regex::RegexBuilder::new(&regex.regex).case_insensitive(true).build()?,
 						fixup: regex.fixup.as_deref().map(Into::into),
+						no_video: regex.no_video.as_deref().map(Into::into),
 					})
 				})
 				.collect::<Result<Vec<_>, _>>()?
@@ -72,6 +74,7 @@ impl TryFrom<&Config> for CompiledConfig {
 pub struct CompiledLinkRegex {
 	pub regex: regex::Regex,
 	pub fixup: Option<Box<str>>,
+	pub no_video: Option<Box<str>>,
 }
 
 #[derive(Clone)]

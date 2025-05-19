@@ -2,27 +2,33 @@
 	"link_regexes": [
 		{
 			"regex": "https?://(?:[^\\.]+\\.)?reddit\\.com/(\\S+)",
-			"fixup": "https://rxddit.com/$1"
+			"fixup": "https://rxddit.com/$1",
+			"no_video": "No media found"
 		},
 		{
 			"regex": "https?://(?:[^\\.]+\\.)?v\\.redd\\.it/\\S+",
-			"fixup": null
+			"fixup": null,
+			"no_video": null
 		},
 		{
 			"regex": "(https?://(?:[^\\.]+\\.)?tikt)o(k\\.com/\\S+)",
-			"fixup": "${1}x${2}"
+			"fixup": "${1}x${2}",
+			"no_video": null
 		},
 		{
 			"regex": "(https?://(?:[^\\.]+\\.)?)(?:twitter|x)\\.com/(\\S+/status(?:es)?/(?:\\d+)(?:\\S+)?)",
-			"fixup": "${1}fixupx.com/${2}"
+			"fixup": "${1}fixupx.com/${2}",
+			"no_video": "No video could be found"
 		},
 		{
 			"regex": "(https?://(?:[^\\.]+\\.)?)(instagram\\.com/\\S+)",
-			"fixup": "${1}dd${2}"
+			"fixup": "${1}dd${2}",
+			"no_video": "There is no video in this post"
 		},
 		{
 			"regex": "https?://(?:[^\\.]+\\.)?(?:facebook|fb)\\.com/(?:story\\b|reel/|share/)\\S+",
-			"fixup": null
+			"fixup": null,
+			"no_video": null
 		}
 	],
 	"admin_guild": {

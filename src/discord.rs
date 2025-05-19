@@ -77,10 +77,20 @@ impl DiscordBot {
 
 		let mut result = None;
 		for _ in 0..2 {
-			result = Some(self.app_ctx.yt_dlp.download(download_url).await);
+			let result = result.insert(self.app_ctx.yt_dlp.download(download_url).await);
 
-			if result.as_ref().unwrap().is_ok() {
-				break;
+			match &*result {
+				Ok(_) => break,
+				Err(err) => {
+					if download_url_regex
+						.no_video
+						.as_deref()
+						.is_some_and(|no_video| err.to_string().contains(no_video))
+					{
+						// No video at this URL. Just ignore it.
+						return;
+					}
+				}
 			}
 		}
 
@@ -202,9 +212,9 @@ impl DiscordBot {
 		let mut content = msg.content.as_str();
 
 		if content == "!dump" {
-			msg.reply(ctx, &self.app_ctx.config.dump().await.unwrap_or_else(|err| format!("ERROR: {err}")))
-				.await
-				.ok();
+			let json = self.app_ctx.config.dump().await.unwrap_or_else(|err| format!("ERROR: {err}"));
+
+			msg.reply(ctx, &json).await.ok();
 
 			return;
 		}
