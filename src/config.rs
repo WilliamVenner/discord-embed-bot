@@ -11,6 +11,10 @@ use tokio::{
 	sync::Mutex,
 };
 
+fn regex_macros(regex: &str) -> String {
+	regex.replace("$URLCHAR", r#"[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]"#)
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
 	pub link_regexes: Box<[LinkRegex]>,
@@ -58,7 +62,7 @@ impl TryFrom<&Config> for CompiledConfig {
 				.iter()
 				.map(|regex| {
 					Ok::<_, Self::Error>(CompiledLinkRegex {
-						regex: regex::RegexBuilder::new(&regex.regex).case_insensitive(true).build()?,
+						regex: regex::RegexBuilder::new(&regex_macros(&regex.regex)).case_insensitive(true).build()?,
 						fixup: regex.fixup.as_deref().map(Into::into),
 						no_video: regex.no_video.as_deref().map(Into::into),
 					})

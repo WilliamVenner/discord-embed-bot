@@ -1,32 +1,32 @@
 {
 	"link_regexes": [
 		{
-			"regex": "https?://(?:[^\\.]+\\.)?reddit\\.com/(\\S+)",
+			"regex": "https?://(?:[^\\.\\s]+\\.)?reddit\\.com/($URLCHAR+)",
 			"fixup": "https://rxddit.com/$1",
 			"no_video": "No media found"
 		},
 		{
-			"regex": "https?://(?:[^\\.]+\\.)?v\\.redd\\.it/\\S+",
+			"regex": "https?://(?:[^\\.\\s]+\\.)?v\\.redd\\.it/$URLCHAR+",
 			"fixup": null,
 			"no_video": null
 		},
 		{
-			"regex": "(https?://(?:[^\\.]+\\.)?tikt)o(k\\.com/\\S+)",
+			"regex": "(https?://(?:[^\\.\\s]+\\.)?tikt)o(k\\.com/$URLCHAR+)",
 			"fixup": "${1}x${2}",
 			"no_video": null
 		},
 		{
-			"regex": "(https?://(?:[^\\.]+\\.)?)(?:twitter|x)\\.com/(\\S+/status(?:es)?/(?:\\d+)(?:\\S+)?)",
+			"regex": "(https?://(?:[^\\.\\s]+\\.)?)(?:twitter|x)\\.com/($URLCHAR+/status(?:es)?/(?:\\d+)(?:$URLCHAR+)?)",
 			"fixup": "${1}fixupx.com/${2}",
 			"no_video": "No video could be found"
 		},
 		{
-			"regex": "(https?://(?:[^\\.]+\\.)?)(instagram\\.com/\\S+)",
+			"regex": "(https?://(?:[^\\.\\s]+\\.)?)(instagram\\.com/$URLCHAR+)",
 			"fixup": "${1}dd${2}",
 			"no_video": "There is no video in this post"
 		},
 		{
-			"regex": "https?://(?:[^\\.]+\\.)?(?:facebook|fb)\\.com/(?:story\\b|reel/|share/)\\S+",
+			"regex": "https?://(?:[^\\.\\s]+\\.)?(?:facebook|fb)\\.com/(?:story\\b|reel/|share/)$URLCHAR+",
 			"fixup": null,
 			"no_video": null
 		}
