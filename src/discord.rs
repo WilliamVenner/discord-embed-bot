@@ -82,10 +82,10 @@ impl DiscordBot {
 			match &*result {
 				Ok(_) => break,
 				Err(err) => {
-					if download_url_regex
-						.no_video
-						.as_deref()
-						.is_some_and(|no_video| err.to_string().contains(no_video))
+					let err = err.to_string();
+
+					if err.contains("yt_dlp.utils.UnsupportedError")
+						|| download_url_regex.no_video.as_deref().is_some_and(|no_video| err.contains(no_video))
 					{
 						// No video at this URL. Just ignore it.
 						return;
