@@ -2,6 +2,7 @@ use crate::{ffprobe::MediaProbe, github, tiktok, USER_AGENT};
 use anyhow::Context;
 use std::{
 	borrow::Cow,
+	fs::Permissions,
 	path::{Path, PathBuf},
 	sync::Arc,
 	time::{Duration, Instant},
@@ -149,6 +150,12 @@ impl YtDlp {
 
 		tokio::io::copy(&mut reqwest::get(browser_download_url.as_ref()).await?.bytes().await?.as_ref(), &mut exe).await?;
 
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::PermissionsExt;
+			exe.set_permissions(Permissions::from_mode(0o755)).await?;
+		}
+
 		log::info!("Downloaded yt-dlp release {}", tag_name);
 
 		if cfg!(target_os = "linux") {
@@ -285,15 +292,12 @@ impl YtDlp {
 
 			Ok(reencoded_path)
 		} else {
-			Err(ReencodeVideoError::Io(std::io::Error::new(
-				std::io::ErrorKind::Other,
-				format!(
-					"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
-					output.status,
-					String::from_utf8_lossy(&output.stderr),
-					String::from_utf8_lossy(&output.stdout)
-				),
-			)))
+			Err(ReencodeVideoError::Io(std::io::Error::other(format!(
+				"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
+				output.status,
+				String::from_utf8_lossy(&output.stderr),
+				String::from_utf8_lossy(&output.stdout)
+			))))
 		}
 	}
 
