@@ -35,6 +35,7 @@ impl DiscordBot {
 		if msg.content.trim().starts_with(".dl ") {
 			return;
 		}
+
 		// Ignore links that are prefixed with !!
 		if msg.content.trim().starts_with("!!") {
 			return;
