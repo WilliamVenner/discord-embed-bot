@@ -36,6 +36,11 @@ impl DiscordBot {
 			return;
 		}
 
+		// Ignore links that are prefixed with !!
+		if msg.content.trim().starts_with("!!") {
+			return;
+		}
+		
 		let mut download_urls = config
 			.link_regexes
 			.iter()
