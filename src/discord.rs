@@ -31,6 +31,12 @@ struct DiscordBot {
 }
 impl DiscordBot {
 	async fn generic_message(&self, ctx: Context, mut msg: Message, config: Arc<CompiledConfig>) {
+		// test whether the bot is alive or not lad,
+		if msg.mentions_me(&ctx.http).await_unwrap_or(false) {
+			msg.react(&ctx.http, ReactionType::Unicode("👋".to_string())).await?;
+			return;
+		}
+		
 		// Ignore NotSoBot .dl commands
 		if msg.content.trim().starts_with(".dl ") {
 			return;
