@@ -22,7 +22,7 @@
 		},
 		{
 			"regex": "(https?://(?:[^\\.\\s]+\\.)?)(instagram\\.com/$URLCHAR+)",
-			"fixup": "${1}dd${2}",
+			"fixup": "${1}kk${2}",
 			"no_video": "There is no video in this post"
 		},
 		{
