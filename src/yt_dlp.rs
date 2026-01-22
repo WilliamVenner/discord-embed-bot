@@ -151,6 +151,7 @@ impl YtDlp {
 
 		#[cfg(unix)]
 		{
+			use std::fs::Permissions;
 			use std::os::unix::fs::PermissionsExt;
 			exe.set_permissions(Permissions::from_mode(0o755)).await?;
 		}
@@ -410,7 +411,31 @@ impl YtDlpDaemon {
 
 		self.update_check().await; // This will complete really quickly and do stuff in the background.
 
-		self.0.yt_dlp.read().await.download(&url, &path.with_extension("mp4")).await
+		let out_path = path.with_extension("mp4");
+
+		let result = self.0.yt_dlp.read().await.download(&url, &out_path).await;
+
+		if result.is_err() && url.contains("tiktok.com") {
+			// Try the fallback TikTok download script
+			log::info!("yt-dlp failed to download TikTok video, trying fallback TikTok download script...");
+
+			let result = tiktok::run_fallback_download_script(&url, &out_path).await;
+
+			match result {
+				Ok(_) => {
+					return Ok(DownloadedMedia {
+						path: out_path.into_boxed_path(),
+						url: None,
+					});
+				}
+
+				Err(err) => {
+					log::error!("Fallback TikTok download script failed: {}", err);
+				}
+			}
+		}
+
+		result
 	}
 
 	async fn update_check(&self) {
