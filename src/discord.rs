@@ -33,10 +33,16 @@ impl DiscordBot {
 	async fn generic_message(&self, ctx: Context, mut msg: Message, config: Arc<CompiledConfig>) {
 		// test whether the bot is alive or not
 		if msg.mentions_me(&ctx.http).await.unwrap_or(false) {
-			msg.react(&ctx.http, '👋').await?;
+			// emergency reboot
+			if Some(msg.author.id.get()) == config.root_user_id && msg.content.contains("kill yourself") {
+				msg.react(&ctx.http, '💀').await.ok();
+				std::process::exit(0);
+			}
+
+			msg.react(&ctx.http, '👋').await.ok();
 			return;
 		}
-		
+
 		// Ignore NotSoBot .dl commands
 		if msg.content.trim().starts_with(".dl ") {
 			return;
@@ -46,7 +52,7 @@ impl DiscordBot {
 		if msg.content.trim().starts_with("!!") {
 			return;
 		}
-		
+
 		let mut download_urls = config
 			.link_regexes
 			.iter()

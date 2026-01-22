@@ -2,7 +2,6 @@ use crate::{ffprobe::MediaProbe, github, tiktok, USER_AGENT};
 use anyhow::Context;
 use std::{
 	borrow::Cow,
-	fs::Permissions,
 	path::{Path, PathBuf},
 	sync::Arc,
 	time::{Duration, Instant},
