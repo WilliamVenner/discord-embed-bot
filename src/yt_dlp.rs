@@ -413,6 +413,8 @@ impl YtDlpDaemon {
 
 		let out_path = path.with_extension("mp4");
 
+		// TODO WAF bypass for TikTok (proof of work)
+
 		let result = self.0.yt_dlp.read().await.download(&url, &out_path).await;
 
 		if result.is_err() && url.contains("tiktok.com") {
