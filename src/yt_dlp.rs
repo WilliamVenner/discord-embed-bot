@@ -53,7 +53,7 @@ impl YtDlpRelease {
 	async fn latest() -> Result<Self, anyhow::Error> {
 		log::info!("Grabbing latest yt-dlp release...");
 
-		let (tag_name, (browser_download_url, size)) = github::Releases::get("yt-dlp/yt-dlp", Duration::from_secs(7))
+		let (tag_name, (browser_download_url, size)) = github::Releases::get("yt-dlp/yt-dlp-nightly-builds", Duration::from_secs(7))
 			.await?
 			.0
 			.into_iter()
