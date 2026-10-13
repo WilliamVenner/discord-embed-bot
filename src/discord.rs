@@ -209,7 +209,7 @@ impl DiscordBot {
 					..
 				}))),
 			) => {
-				msg.react(&ctx, '🤰').await.ok();
+				msg.react(&ctx, '🫃').await.ok();
 			}
 
 			Err(UploadMediaError::Other(err)) => {
