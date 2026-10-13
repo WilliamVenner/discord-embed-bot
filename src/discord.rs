@@ -31,8 +31,26 @@ struct DiscordBot {
 }
 impl DiscordBot {
 	async fn generic_message(&self, ctx: Context, mut msg: Message, config: Arc<CompiledConfig>) {
+		// test whether the bot is alive or not
+		// mentions_me is also true for replies; only wave on an actual @mention
+		if msg.mentions.iter().any(|user| user.id == ctx.cache.current_user().id) {
+			// emergency reboot
+			if Some(msg.author.id.get()) == config.root_user_id && msg.content.contains("kill yourself") {
+				msg.react(&ctx.http, '💀').await.ok();
+				std::process::exit(0);
+			}
+
+			msg.react(&ctx.http, '👋').await.ok();
+			return;
+		}
+
 		// Ignore NotSoBot .dl commands
 		if msg.content.trim().starts_with(".dl ") {
+			return;
+		}
+
+		// Ignore links that are prefixed with !!
+		if msg.content.trim().starts_with("!!") {
 			return;
 		}
 
