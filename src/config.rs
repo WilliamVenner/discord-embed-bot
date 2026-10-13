@@ -19,12 +19,14 @@ fn regex_macros(regex: &str) -> String {
 pub struct Config {
 	pub link_regexes: Box<[LinkRegex]>,
 	pub admin_guild: Option<AdminGuild>,
+	pub root_user_id: Option<u64>,
 }
 impl Default for Config {
 	fn default() -> Self {
 		Self {
 			link_regexes: Box::new([]),
 			admin_guild: None,
+			root_user_id: None,
 		}
 	}
 }
@@ -46,6 +48,7 @@ pub struct AdminGuild {
 pub struct CompiledConfig {
 	pub link_regexes: Box<[CompiledLinkRegex]>,
 	pub admin_guild: Option<AdminGuild>,
+	pub root_user_id: Option<u64>,
 }
 impl Default for CompiledConfig {
 	fn default() -> Self {
@@ -71,6 +74,8 @@ impl TryFrom<&Config> for CompiledConfig {
 				.into_boxed_slice(),
 
 			admin_guild: config.admin_guild.clone(),
+
+			root_user_id: config.root_user_id,
 		})
 	}
 }

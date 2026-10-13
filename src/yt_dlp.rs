@@ -2,7 +2,6 @@ use crate::{ffprobe::MediaProbe, github, tiktok, USER_AGENT};
 use anyhow::Context;
 use std::{
 	borrow::Cow,
-	fs::Permissions,
 	path::{Path, PathBuf},
 	sync::Arc,
 	time::{Duration, Instant},
@@ -54,7 +53,7 @@ impl YtDlpRelease {
 	async fn latest() -> Result<Self, anyhow::Error> {
 		log::info!("Grabbing latest yt-dlp release...");
 
-		let (tag_name, (browser_download_url, size)) = github::Releases::get("yt-dlp/yt-dlp", Duration::from_secs(7))
+		let (tag_name, (browser_download_url, size)) = github::Releases::get("yt-dlp/yt-dlp-nightly-builds", Duration::from_secs(7))
 			.await?
 			.0
 			.into_iter()
@@ -152,6 +151,7 @@ impl YtDlp {
 
 		#[cfg(unix)]
 		{
+			use std::fs::Permissions;
 			use std::os::unix::fs::PermissionsExt;
 			exe.set_permissions(Permissions::from_mode(0o755)).await?;
 		}
@@ -411,7 +411,33 @@ impl YtDlpDaemon {
 
 		self.update_check().await; // This will complete really quickly and do stuff in the background.
 
-		self.0.yt_dlp.read().await.download(&url, &path.with_extension("mp4")).await
+		let out_path = path.with_extension("mp4");
+
+		// TODO WAF bypass for TikTok (proof of work)
+
+		let result = self.0.yt_dlp.read().await.download(&url, &out_path).await;
+
+		if result.is_err() && url.contains("tiktok.com") {
+			// Try the fallback TikTok download script
+			log::info!("yt-dlp failed to download TikTok video, trying fallback TikTok download script...");
+
+			let result = tiktok::run_fallback_download_script(&url, &out_path).await;
+
+			match result {
+				Ok(_) => {
+					return Ok(DownloadedMedia {
+						path: out_path.into_boxed_path(),
+						url: None,
+					});
+				}
+
+				Err(err) => {
+					log::error!("Fallback TikTok download script failed: {}", err);
+				}
+			}
+		}
+
+		result
 	}
 
 	async fn update_check(&self) {

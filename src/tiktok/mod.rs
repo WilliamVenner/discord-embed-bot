@@ -171,6 +171,46 @@ async fn generate_slideshow_video(out: &Path, images: &[SlideshowImage<'_>], mus
 	Ok(())
 }
 
+pub async fn run_fallback_download_script(url: &str, out_path: &Path) -> Result<(), anyhow::Error> {
+	log::info!("Trying TikTok fallback download script for URL: {}", url);
+
+	let output = Command::new("python3")
+		.arg(std::env::current_dir()?.join("src/tiktok/tiktok.py"))
+		.arg(url)
+		.arg("--max-size")
+		.arg("10000000")
+		.env("FFMPEG_PATH", "ffmpeg")
+		.env("PYTHONIOENCODING", "utf-8")
+		.current_dir(out_path.parent().unwrap())
+		.output()
+		.await?;
+
+	if !output.status.success() {
+		return Err(anyhow::anyhow!(
+			"Exit status: {}\n\n=========== stderr ===========\n{}\n\n=========== stdout ===========\n{}",
+			output.status,
+			String::from_utf8_lossy(&output.stderr),
+			String::from_utf8_lossy(&output.stdout),
+		));
+	}
+
+	#[derive(Debug, serde::Deserialize)]
+	#[allow(unused)]
+	struct TiktokScriptOutput {
+		filepath: String,
+		filename: String,
+		mimetype: String,
+		size: u64,
+		original_url: String,
+	}
+
+	let script_output: TiktokScriptOutput = serde_json::from_slice(&output.stdout)?;
+
+	std::fs::rename(&script_output.filepath, out_path)?;
+
+	Ok(())
+}
+
 #[test]
 fn test_slideshow() {
 	std::fs::create_dir_all("yt_dlp_out").unwrap();
