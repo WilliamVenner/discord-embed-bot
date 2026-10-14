@@ -32,7 +32,9 @@ struct DiscordBot {
 impl DiscordBot {
 	async fn generic_message(&self, ctx: Context, mut msg: Message, config: Arc<CompiledConfig>) {
 		// test whether the bot is alive or not
-		if msg.mentions_me(&ctx.http).await.unwrap_or(false) {
+		// mentions / mentions_me are also true for replies; only wave on an actual <@id> in the text
+		let bot_id = ctx.cache.current_user().id;
+		if msg.content.contains(&format!("<@{bot_id}>")) || msg.content.contains(&format!("<@!{bot_id}>")) {
 			// emergency reboot
 			if Some(msg.author.id.get()) == config.root_user_id && msg.content.contains("kill yourself") {
 				msg.react(&ctx.http, '💀').await.ok();
